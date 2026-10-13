@@ -12,7 +12,7 @@ const GRAVS = ['Informativa', 'Baixa', 'Média', 'Alta', 'Crítica'];
 const gravCls = g => ({ Informativa: 'mut', Baixa: 'ok', 'Média': 'warn', Alta: 'warn', 'Crítica': 'bad' }[g] || 'mut');
 const METOD = 'Inspeção visual realizada in loco, com registro fotográfico georreferenciado e datado, sem ensaios destrutivos.';
 const DEFAULTS = {
-  empresa: { nome: 'Controladoria-Geral da União', cnpj: '', endereco: '', fone: '', email: '' },
+  empresa: { nome: 'Controladoria-Geral da União', cnpj: '26.664.015/0001-48', endereco: 'SAUS, Quadra 5, Bloco A, Lotes 9 e 10, Edifício MultiBrasil, Asa Sul, Brasília/DF - CEP 70070-050', fone: '', email: '' },
   rt: { nome: '', titulo: '', crea: '' },
   usuario: '', carimbo: true, maxpx: 1600, pinHash: ''
 };
@@ -53,6 +53,14 @@ const datalist = (id, arr) => `<datalist id="${id}">${arr.map(x => `<option valu
 async function loadSettings() {
   const c = await DB.getSetting('cfg', {});
   S = { ...DEFAULTS, ...c, empresa: { ...DEFAULTS.empresa, ...(c.empresa || {}) }, rt: { ...DEFAULTS.rt, ...(c.rt || {}) } };
+  // Preenche o cadastro institucional já existente sem substituir dados personalizados.
+  if (S.empresa.nome.trim() === DEFAULTS.empresa.nome) {
+    let changed = false;
+    for (const k of ['cnpj', 'endereco']) {
+      if (!String(S.empresa[k] || '').trim()) { S.empresa[k] = DEFAULTS.empresa[k]; changed = true; }
+    }
+    if (changed) await DB.setSetting('cfg', S);
+  }
 }
 const saveSettings = () => DB.setSetting('cfg', S);
 async function loadLogo() {
@@ -475,7 +483,8 @@ async function exportBackup(obraId) {
 $('#impIn').addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = ''; if (!file) return;
   try {
-    toast('Importando…'); const d = JSON.parse(await file.text()); if (!['cgu-vistorias', 'all-vistorias'].includes(d.app)) throw new Error('arquivo inválido');
+    toast('Importando…'); const d = JSON.parse(await file.text());
+    if (d?.v !== 1 || !['obras', 'vistorias', 'emissoes', 'fotos'].every(k => Array.isArray(d[k]))) throw new Error('arquivo inválido');
     for (const o of d.obras) await DB.put('obras', o);
     for (const v of d.vistorias) { const cur = await DB.get('vistorias', v.id); if (!cur || (cur.updatedAt || 0) <= (v.updatedAt || 0)) await DB.put('vistorias', v); }
     for (const x of d.emissoes) await DB.put('emissoes', x);
@@ -492,6 +501,6 @@ window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferr
   await DB.open(); await loadSettings(); await loadLogo();
   if (navigator.storage?.persist) navigator.storage.persist();
   document.querySelector('#version').textContent = 'v' + CGU.version;
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => { });
   route();
 })();

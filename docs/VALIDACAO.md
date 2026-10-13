@@ -1,5 +1,13 @@
 # Validação da versão 1.0.0
 
+## Atualização 1.0.1 · 13/10/2026
+
+- Cadastro novo e preenchimento de CNPJ/endereço em perfis existentes com campos vazios verificados.
+- Dados personalizados, usuário, PIN e cadastros de unidades regionais preservados na migração.
+- Dados institucionais confirmados no Contrato Administrativo 07/2025 publicado pela CGU.
+- Aplicativo e manual HTML/PDF verificados sem referências à marca anterior.
+- Manual PDF regenerado com 15 páginas e revisão visual; tela de Ajustes atualizada.
+
 Executada em 12/10/2026, com Edge/Chromium, servidor local HTTP e dados fictícios.
 
 ## Resultados
