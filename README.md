@@ -27,6 +27,7 @@ Hospede esta pasta em HTTPS, preservando os caminhos. Não há dependências par
 
 - [Manual ilustrado HTML](manual.html), disponível pela aba Manual.
 - [Manual PDF](docs/manual-usuario.pdf): 15 páginas e 12 telas reais com dados demonstrativos.
+- [Diagramas UML e BPMN](docs/diagramas.html): estrutura e fluxo de funcionamento da ferramenta, com fontes editáveis.
 
 ## Identidade visual
 

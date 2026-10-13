@@ -1,0 +1,92 @@
+@startuml
+title CGU Vistorias — modelo estrutural
+left to right direction
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+
+package "Interface (app.js)" {
+  class Aplicacao as App {
+    +rotear(): Promise
+    +editarEdificio()
+    +criarVistoria()
+    +registrarFoto()
+    +editarConstatacao()
+    +emitirDocumento()
+    +exportarBackup()
+    +importarBackup()
+  }
+  class ServicoRelatorio as Rep {
+    +gerarVT()
+    +gerarMF()
+    +gerarRC()
+    +exportarDOCX()
+    +exportarPDF()
+  }
+}
+package "Persistência local (db.js / IndexedDB)" {
+  class Edificio <<object store: obras>> {
+    +id: UUID
+    +nome: String
+    +cliente: String
+    +endereco: String
+  }
+  class Vistoria <<object store: vistorias>> {
+    +id: UUID
+    +obraId: UUID
+    +tipo: String
+    +data: Date
+    +status: rascunho | oficial
+    +gps: Coordenadas?
+    +objetivo: String
+    +metodologia: String
+    +conclusao: String
+    +recomendacoes: String
+  }
+  class Foto <<object store: fotos>> {
+    +id: UUID
+    +vistoriaId: UUID
+    +blob: Blob
+    +ts: Timestamp
+    +lat/lon: Number?
+    +origem: camera | galeria
+    +descricao: String
+    +notas/marcacoes
+  }
+  class Constatacao <<embedded: Vistoria.constatacoes[]> {
+    +id: UUID
+    +titulo: String
+    +descricao: String
+    +fotoIds: UUID[]
+  }
+  class Emissao <<object store: emissoes>> {
+    +id: UUID
+    +vistoriaId: UUID
+    +obraId: UUID
+    +tipo: VT | MF | RC
+    +formato: DOCX | PDF
+    +numero: String
+    +rev: Number
+    +arquivo: String
+    +data: Timestamp
+  }
+  class Configuracao <<object store: settings>> {
+    +key: cfg | seq-AAAA
+    +value: perfil | sequencia
+  }
+}
+App ..> Edificio : CRUD
+App ..> Vistoria : CRUD
+App ..> Foto : captura e edição
+App ..> Emissao : histórico
+App ..> Configuracao : perfil e sequências
+App ..> Rep : solicita documento
+Rep ..> Vistoria : lê dados
+Rep ..> Foto : incorpora evidências
+Rep ..> Edificio : cabeçalho
+Edificio "1" *-- "0..*" Vistoria : obraId
+Vistoria "1" *-- "0..*" Foto : vistoriaId
+Vistoria "1" *-- "0..*" Constatacao : lista embutida
+Constatacao "0..*" .. "0..*" Foto : fotoIds
+Vistoria "1" <-- "0..*" Emissao : vistoriaId
+@enduml
