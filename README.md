@@ -8,15 +8,9 @@ Aplicação web instalável (PWA) para organizar vistorias, registrar evidência
 
 GitHub Pages ativado em 13/10/2026. O repositório é público, conforme autorização do proprietário. A origem da publicação é a raiz da branch `main`; novos pushes nessa branch atualizam o site automaticamente. O arquivo `.nojekyll` mantém a aplicação estática sem processamento de templates. A interface, o manifesto PWA e os arquivos offline usam caminhos relativos ao projeto.
 
-Para atualizar: altere os arquivos, faça commit e push para `main`, e aguarde a execução `pages build and deployment` na aba Actions do GitHub. Os dados de vistoria continuam locais no navegador de cada usuário. GitHub Pages e Netlify têm origens diferentes; para levar registros de um endereço ao outro, exporte o backup JSON no endereço antigo e importe no novo.
+Para atualizar: altere os arquivos, faça commit e push para `main`, e aguarde a execução `pages build and deployment` na aba Actions do GitHub. Os dados de vistoria continuam locais no navegador de cada usuário. Para transferir registros entre endereços, importe um backup JSON exportado no endereço anterior.
 
-### Hospedagem anterior no Netlify
-
-[Abrir CGU Vistorias](https://cgu-vistorias.netlify.app/) · [Manual online](https://cgu-vistorias.netlify.app/manual)
-
-Versão 1.0.0 implantada pelo Netlify Drop em 12/10/2026, na equipe `lichonglee`. Projeto Netlify: `82d06eab-eefd-4a00-a268-1785fa6b562b`. A visibilidade privada padrão da equipe foi mantida: é necessário acessar com uma conta Netlify da equipe. O site foi reivindicado na conta e não está sujeito à expiração do Drop temporário.
-
-Para atualizar manualmente, abra o [painel do projeto](https://app.netlify.com/projects/cgu-vistorias/overview) e envie o ZIP com `index.html` na raiz. Não há integração automática com o GitHub nesta implantação. Após o upload, verifique o aplicativo e o download do manual. Os dados de vistoria continuam locais no navegador de cada usuário.
+A hospedagem anterior no Netlify foi excluída em 13/10/2026, conforme solicitação do proprietário. A publicação atual é somente pelo GitHub Pages.
 
 ## Publicar e usar
 
