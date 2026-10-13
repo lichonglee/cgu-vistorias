@@ -2,6 +2,14 @@
 
 Aplicação web instalável (PWA) para organizar vistorias, registrar evidências e gerar relatórios em Word e PDF. Adaptada de [ALL Vistorias](https://github.com/lichonglee/all-vistorias), commit `f50d11a440ed3e8d3539bcefb7452ab953f14bab`, com o histórico Git preservado.
 
+## Aplicação hospedada
+
+[Abrir CGU Vistorias](https://cgu-vistorias.netlify.app/) · [Manual online](https://cgu-vistorias.netlify.app/manual)
+
+Versão 1.0.0 implantada pelo Netlify Drop em 12/10/2026, na equipe `lichonglee`. Projeto Netlify: `82d06eab-eefd-4a00-a268-1785fa6b562b`. A visibilidade privada padrão da equipe foi mantida: é necessário acessar com uma conta Netlify da equipe. O site foi reivindicado na conta e não está sujeito à expiração do Drop temporário.
+
+Para atualizar manualmente, abra o [painel do projeto](https://app.netlify.com/projects/cgu-vistorias/overview) e envie o ZIP com `index.html` na raiz. Não há integração automática com o GitHub nesta implantação. Após o upload, verifique o aplicativo e o download do manual. Os dados de vistoria continuam locais no navegador de cada usuário.
+
 ## Publicar e usar
 
 Hospede esta pasta em HTTPS, preservando os caminhos. Não há dependências para instalar nem etapa de compilação. O repositório entrega o código; sua disponibilidade no GitHub não equivale à hospedagem. GitHub Pages em repositórios privados depende de plano compatível. Também pode ser usada hospedagem HTTPS autorizada pela equipe.
