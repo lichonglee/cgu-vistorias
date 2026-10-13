@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 1.0.2 · 13/10/2026
+
+- Ajustes CGU completos com telefone, e-mail, responsável técnico, título e CREA informados pela equipe.
+- Preenchimento automático dos novos campos em perfis CGU existentes, preservando valores personalizados.
+- Manual HTML e PDF atualizados para a versão 1.0.2.
+
 ## 1.0.1 · 13/10/2026
 
 - Cadastro institucional com CNPJ e endereço da sede verificados em fonte oficial.

@@ -1,6 +1,6 @@
 /* Identificação central do produto. Atualize version em cada lançamento. */
 const CGU = Object.freeze({
-  version: '1.0.1',
+  version: '1.0.2',
   icon(name) {
     const paths = {
       camera: '<path d="M4 6h4l2-3h4l2 3h4v14H4z"/><circle cx="12" cy="12" r="4"/>',

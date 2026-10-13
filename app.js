@@ -12,8 +12,8 @@ const GRAVS = ['Informativa', 'Baixa', 'Média', 'Alta', 'Crítica'];
 const gravCls = g => ({ Informativa: 'mut', Baixa: 'ok', 'Média': 'warn', Alta: 'warn', 'Crítica': 'bad' }[g] || 'mut');
 const METOD = 'Inspeção visual realizada in loco, com registro fotográfico georreferenciado e datado, sem ensaios destrutivos.';
 const DEFAULTS = {
-  empresa: { nome: 'Controladoria-Geral da União', cnpj: '26.664.015/0001-48', endereco: 'SAUS, Quadra 5, Bloco A, Lotes 9 e 10, Edifício MultiBrasil, Asa Sul, Brasília/DF - CEP 70070-050', fone: '', email: '' },
-  rt: { nome: '', titulo: '', crea: '' },
+  empresa: { nome: 'Controladoria-Geral da União', cnpj: '26.664.015/0001-48', endereco: 'SAUS, Quadra 5, Bloco A, Lotes 9 e 10, Edifício MultiBrasil, Asa Sul, Brasília/DF - CEP 70070-050', fone: '(61) 2020-6831', email: 'cglpe.cogea@cgu.gov.br' },
+  rt: { nome: 'Li Chong Lee Bacelar de Castro', titulo: 'Coordenador de Engenharia e Arquitetura - COGEA', crea: '12158 DF' },
   usuario: '', carimbo: true, maxpx: 1600, pinHash: ''
 };
 let S = null, logo = null, token = 0, tab = 'dados';
@@ -53,11 +53,14 @@ const datalist = (id, arr) => `<datalist id="${id}">${arr.map(x => `<option valu
 async function loadSettings() {
   const c = await DB.getSetting('cfg', {});
   S = { ...DEFAULTS, ...c, empresa: { ...DEFAULTS.empresa, ...(c.empresa || {}) }, rt: { ...DEFAULTS.rt, ...(c.rt || {}) } };
-  // Preenche o cadastro institucional já existente sem substituir dados personalizados.
+  // Completa o perfil CGU existente sem substituir dados personalizados.
   if (S.empresa.nome.trim() === DEFAULTS.empresa.nome) {
     let changed = false;
-    for (const k of ['cnpj', 'endereco']) {
+    for (const k of ['cnpj', 'endereco', 'fone', 'email']) {
       if (!String(S.empresa[k] || '').trim()) { S.empresa[k] = DEFAULTS.empresa[k]; changed = true; }
+    }
+    for (const k of ['nome', 'titulo', 'crea']) {
+      if (!String(S.rt[k] || '').trim()) { S.rt[k] = DEFAULTS.rt[k]; changed = true; }
     }
     if (changed) await DB.setSetting('cfg', S);
   }
