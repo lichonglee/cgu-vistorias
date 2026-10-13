@@ -28,14 +28,14 @@ const Rep = (() => {
     const B = [];
     B.push({ t: 'cover', title: meta.titulo, sub: v.tipo || 'Vistoria técnica', rows: [
       ['Documento nº', `${meta.numero}  ·  Revisão ${meta.rev}`],
-      ['Obra', o.nome], ['Cliente', o.cliente || '—'], ['Local visitado', v.local || '—'],
+      ['Edifício', o.nome], ['Cliente', o.cliente || '—'], ['Local visitado', v.local || '—'],
       ['Data da vistoria', `${fData(v.data)}${v.hora ? ' às ' + v.hora : ''}`],
       ...(cons ? [['Conteúdo', `Memorial de vistoria técnica e registro fotográfico (${fotos.length} foto${fotos.length === 1 ? '' : 's'})`]] : []),
       ['Responsável técnico', [S.rt.nome, S.rt.titulo, S.rt.crea && 'CREA ' + S.rt.crea].filter(Boolean).join(' · ') || '—'],
     ] });
     B.push({ t: 'h1', text: '1. IDENTIFICAÇÃO' });
     B.push({ t: 'kv', rows: [
-      ['Obra', o.nome], ['Cliente / contratante', o.cliente || '—'], ['Endereço da obra', o.endereco || '—'],
+      ['Edifício', o.nome], ['Cliente / contratante', o.cliente || '—'], ['Endereço do edifício', o.endereco || '—'],
       ['Contrato / ART / RRT', [o.contrato, o.art].filter(Boolean).join(' · ') || '—'],
       ['Local visitado', v.local || '—'], ['Tipo de vistoria', v.tipo || '—'],
       ['Data e hora', `${fData(v.data)}${v.hora ? ' às ' + v.hora : ''}`],
@@ -91,7 +91,7 @@ const Rep = (() => {
     const B = [];
     B.push({ t: 'cover', title: meta.titulo, sub: v.tipo || 'Vistoria técnica', rows: [
       ['Documento nº', `${meta.numero}  ·  Revisão ${meta.rev}`],
-      ['Obra', o.nome], ['Cliente', o.cliente || '—'], ['Local visitado', v.local || '—'],
+      ['Edifício', o.nome], ['Cliente', o.cliente || '—'], ['Local visitado', v.local || '—'],
       ['Data da vistoria', `${fData(v.data)}${v.hora ? ' às ' + v.hora : ''}`],
       ['Total de fotos', String(fotos.length)],
       ['Responsável técnico', [S.rt.nome, S.rt.titulo, S.rt.crea && 'CREA ' + S.rt.crea].filter(Boolean).join(' · ') || '—'],

@@ -1,4 +1,4 @@
-# CGU Vistorias · v1.0.2
+# CGU Vistorias · v1.0.3
 
 Aplicação web instalável (PWA) para organizar vistorias, registrar evidências e gerar relatórios em Word e PDF com a identidade visual da Controladoria-Geral da União.
 
@@ -18,7 +18,7 @@ Hospede esta pasta em HTTPS, preservando os caminhos. Não há dependências par
 
 1. Abra o endereço com internet e aguarde o carregamento inicial.
 2. Em **Ajustes**, configure unidade, responsável técnico e vistoriador.
-3. Siga **Obras → Nova vistoria → Dados → Fotos → Constatações → Conclusão → Emitir**.
+3. Siga **Edifícios → Novo edifício → Nova vistoria → Dados → Fotos → Constatações → Conclusão → Emitir**.
 4. Instale pelo menu do Chrome/Android ou Compartilhar do Safari/iPhone, conforme a opção disponível.
 5. Abra o manual e teste sem internet antes de sair a campo.
 6. Exporte um backup ao terminar a jornada.
@@ -38,7 +38,7 @@ A interface usa Calibri e alternativas locais Carlito, Segoe UI e Arial. Humanst
 
 Os dados ficam no IndexedDB `cgu-vistorias`, no aparelho e navegador utilizados. Não há servidor de dados, login institucional, sincronização em nuvem, criptografia ou assinatura digital.
 
-**Exportar tudo (.json)** inclui obras, vistorias, fotos, marcações, emissões e sequências; perfil e PIN não são incluídos. **Importar backup** aceita arquivos compatíveis com o formato de registros versão 1: mescla identificadores e prioriza a vistoria mais recente. Obras e fotos de mesmo identificador podem ser substituídas. Guarde uma cópia antes da consolidação.
+**Exportar tudo (.json)** inclui edifícios, vistorias, fotos, marcações, emissões e sequências; perfil e PIN não são incluídos. **Importar backup** aceita arquivos compatíveis com o formato de registros versão 1: mescla identificadores e prioriza a vistoria mais recente. Edifícios e fotos de mesmo identificador podem ser substituídas. Guarde uma cópia antes da consolidação.
 
 A emissão oficial é um controle local de número e histórico; não representa aprovação institucional. A sequência é por aparelho e pode coincidir entre celulares. Defina um aparelho para a emissão final ou revise os números após consolidar.
 

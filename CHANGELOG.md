@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## 1.0.3 · 13/10/2026
+
+- Renomeia a área de Obras para Edifícios na interface, no Painel e nos relatórios.
+- Atualiza o manual do usuário e os arquivos da versão 1.0.3.
+
 ## 1.0.2 · 13/10/2026
 
 - Ajustes CGU completos com telefone, e-mail, responsável técnico, título e CREA informados pela equipe.

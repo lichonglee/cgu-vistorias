@@ -233,16 +233,16 @@ window.addEventListener('hashchange', () => { closeModal(); route(); window.scro
 
 /* ---------- OBRAS ---------- */
 async function vObras(view) {
-  setTitle('Obras', ''); setNav('obras');
+  setTitle('Edifícios', ''); setNav('obras');
   const obras = (await DB.all('obras')).sort((a, b) => a.nome.localeCompare(b.nome));
   const vs = await DB.all('vistorias');
   const rasc = vs.filter(v => v.status !== 'emitido').sort((a, b) => b.updatedAt - a.updatedAt)[0];
   const ob = rasc && obras.find(o => o.id === rasc.obraId);
   view.innerHTML = `
     ${rasc && ob ? `<div class="card tap" data-go="#/vistoria/${rasc.id}" style="border-color:var(--a)"><div class="mut small">CONTINUAR VISTORIA</div><b>${esc(rasc.local || 'Sem local')}</b><div class="mut small">${esc(ob.nome)} · ${Rep.fData(rasc.data)} · ${rasc.nFotos || 0} foto(s)</div></div>` : ''}
-    <input id="q" type="search" placeholder="Buscar obra ou cliente…" style="margin-bottom:12px">
-    <div id="lst">${obras.map(o => cardObra(o, vs)).join('') || '<div class="empty">Nenhuma obra cadastrada.<br>Toque em <b>+ Obra</b> para começar.</div>'}</div>
-    <button class="btn fab" id="nova">+ Obra</button>`;
+    <input id="q" type="search" placeholder="Buscar edifício ou cliente…" style="margin-bottom:12px">
+    <div id="lst">${obras.map(o => cardObra(o, vs)).join('') || '<div class="empty">Nenhum edifício cadastrado.<br>Toque em <b>+ Edifício</b> para começar.</div>'}</div>
+    <button class="btn fab" id="nova">+ Edifício</button>`;
   bindGo(view);
   $('#q').oninput = e => { const q = e.target.value.toLowerCase(); $('#lst').innerHTML = obras.filter(o => (o.nome + ' ' + o.cliente).toLowerCase().includes(q)).map(o => cardObra(o, vs)).join('') || '<div class="empty">Nada encontrado.</div>'; bindGo(view); };
   $('#nova').onclick = () => obraSheet();
@@ -251,14 +251,14 @@ const cardObra = (o, vs) => { const mine = vs.filter(v => v.obraId === o.id); re
 function bindGo(root) { root.querySelectorAll('[data-go]').forEach(el => el.onclick = () => location.hash = el.dataset.go); }
 function obraSheet(o) {
   const novo = !o; o = o || { id: DB.uid(), nome: '', cliente: '', endereco: '', contrato: '', art: '', criadoEm: Date.now() };
-  const el = modal(`<h2>${novo ? 'Nova obra' : 'Editar obra'}</h2>
-    ${fld('Nome da obra *', 'nome', o, { ph: 'Ex.: Reforma de unidade administrativa' })}${fld('Cliente / contratante', 'cliente', o)}${fld('Endereço da obra', 'endereco', o)}
+  const el = modal(`<h2>${novo ? 'Novo edifício' : 'Editar edifício'}</h2>
+    ${fld('Nome do edifício *', 'nome', o, { ph: 'Ex.: Edifício-sede da unidade' })}${fld('Cliente / contratante', 'cliente', o)}${fld('Endereço do edifício', 'endereco', o)}
     <div class="grid2">${fld('Contrato / proposta', 'contrato', o)}${fld('ART / RRT', 'art', o)}</div>
     <div class="row" style="margin-top:14px"><button class="btn grow" id="ok">Salvar</button><button class="btn ghost" id="x">Cancelar</button></div>`);
   bindFields(el, o, () => { });
   el.querySelector('#x').onclick = closeModal;
   el.querySelector('#ok').onclick = async () => {
-    if (!o.nome.trim()) return toast('Informe o nome da obra'); await DB.put('obras', o); closeModal();
+    if (!o.nome.trim()) return toast('Informe o nome do edifício'); await DB.put('obras', o); closeModal();
     if (novo) location.hash = '#/obra/' + o.id; else route();
   };
 }
@@ -271,15 +271,15 @@ async function vObra(view, id) {
   view.innerHTML = `
     <div class="card"><div class="mut small">CLIENTE</div><div>${esc(o.cliente || '—')}</div><div class="mut small" style="margin-top:6px">ENDEREÇO</div><div>${esc(o.endereco || '—')}</div>
     ${(o.contrato || o.art) ? `<div class="mut small" style="margin-top:6px">CONTRATO / ART</div><div>${esc([o.contrato, o.art].filter(Boolean).join(' · '))}</div>` : ''}
-    <div class="row wrap" style="margin-top:10px"><button class="btn sec sm" id="eo">Editar obra</button><button class="btn sec sm" id="xo">Exportar backup da obra</button></div></div>
+    <div class="row wrap" style="margin-top:10px"><button class="btn sec sm" id="eo">Editar edifício</button><button class="btn sec sm" id="xo">Exportar backup do edifício</button></div></div>
     <button class="btn block" id="nv">+ Nova vistoria</button>
     <h2>Vistorias / locais visitados</h2>
-    ${vs.map(v => `<div class="card tap" data-go="#/vistoria/${v.id}"><div class="row sp"><b>${esc(v.local || 'Sem local')}</b>${stChip(v)}</div><div class="mut small">${Rep.fData(v.data)} ${esc(v.hora || '')} · ${esc(v.tipo || '')} · ${v.nFotos || 0} foto(s)${v.seq ? ' · VT-' + pad(v.seq, 3) + '/' + v.ano : ''}</div></div>`).join('') || '<div class="empty">Nenhuma vistoria nesta obra.</div>'}
-    <div style="margin-top:20px"><button class="btn bad sm" id="do">Excluir obra</button></div>`;
+    ${vs.map(v => `<div class="card tap" data-go="#/vistoria/${v.id}"><div class="row sp"><b>${esc(v.local || 'Sem local')}</b>${stChip(v)}</div><div class="mut small">${Rep.fData(v.data)} ${esc(v.hora || '')} · ${esc(v.tipo || '')} · ${v.nFotos || 0} foto(s)${v.seq ? ' · VT-' + pad(v.seq, 3) + '/' + v.ano : ''}</div></div>`).join('') || '<div class="empty">Nenhuma vistoria neste edifício.</div>'}
+    <div style="margin-top:20px"><button class="btn bad sm" id="do">Excluir edifício</button></div>`;
   bindGo(view);
   $('#eo').onclick = () => obraSheet(o);
   $('#xo').onclick = () => exportBackup(o.id);
-  $('#do').onclick = async () => { if (await confirmar(`Excluir a obra "${o.nome}" e TODAS as suas vistorias e fotos? Não há como desfazer.`)) { await DB.delObra(o.id); location.hash = '#/'; } };
+  $('#do').onclick = async () => { if (await confirmar(`Excluir o edifício "${o.nome}" e TODAS as suas vistorias e fotos? Não há como desfazer.`)) { await DB.delObra(o.id); location.hash = '#/'; } };
   $('#nv').onclick = async () => {
     const v = { id: DB.uid(), obraId: o.id, local: '', tipo: TIPOS[0], data: hoje(), hora: agora(), participantes: S.usuario || '', clima: '', objetivo: '', metodologia: METOD, documentos: '', descricao: '', constatacoes: [], conclusao: '', recomendacoes: '', status: 'rascunho', nFotos: 0, gps: null, criadoEm: Date.now(), updatedAt: Date.now() };
     await DB.put('vistorias', v); tab = 'dados'; location.hash = '#/vistoria/' + v.id;
@@ -299,7 +299,7 @@ async function vVistoria(view, id) {
   view.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; route(); });
   const tb = $('#tb'); const save = (p, val) => patchV(v.id, p, val);
   if (tab === 'dados') {
-    tb.innerHTML = `<div class="card"><div class="mut small">OBRA</div><b>${esc(o.nome)}</b>
+    tb.innerHTML = `<div class="card"><div class="mut small">EDIFÍCIO</div><b>${esc(o.nome)}</b>
       ${fld('Local visitado *', 'local', v, { ph: 'Ex.: Bloco B – 3º pavimento / Subsolo' })}
       ${fld('Tipo de vistoria', 'tipo', v, { list: 'dl-tipo' })}${datalist('dl-tipo', TIPOS)}
       <div class="grid2 keep">${fld('Data', 'data', v, { type: 'date' })}${fld('Hora', 'hora', v, { type: 'time' })}</div>
@@ -429,21 +429,21 @@ async function vPainel(view) {
   const grupos = {};
   F.forEach(v => { const k = filtro.grupo === 'obra' ? (om[v.obraId]?.nome || '—') : (v.local || 'Sem local'); (grupos[k] ||= []).push(v); });
   view.innerHTML = `
-    <div class="kpis"><div class="kpi"><b>${new Set(F.map(v => v.obraId)).size}</b><span>OBRAS</span></div><div class="kpi"><b>${F.length}</b><span>VISTORIAS</span></div><div class="kpi"><b>${F.filter(v => v.status === 'emitido').length}</b><span>EMITIDAS</span></div><div class="kpi"><b>${F.filter(v => v.status !== 'emitido').length}</b><span>EM RASCUNHO</span></div><div class="kpi"><b>${nFotos}</b><span>FOTOS</span></div><div class="kpi"><b>${E.length}</b><span>EMISSÕES</span></div></div>
-    <div class="card"><div class="grid2"><div><label style="margin-top:0">Obra</label><select data-f="obra"><option value="">Todas</option>${obras.map(o => `<option value="${o.id}" ${filtro.obra === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></div>
+    <div class="kpis"><div class="kpi"><b>${new Set(F.map(v => v.obraId)).size}</b><span>EDIFÍCIOS</span></div><div class="kpi"><b>${F.length}</b><span>VISTORIAS</span></div><div class="kpi"><b>${F.filter(v => v.status === 'emitido').length}</b><span>EMITIDAS</span></div><div class="kpi"><b>${F.filter(v => v.status !== 'emitido').length}</b><span>EM RASCUNHO</span></div><div class="kpi"><b>${nFotos}</b><span>FOTOS</span></div><div class="kpi"><b>${E.length}</b><span>EMISSÕES</span></div></div>
+    <div class="card"><div class="grid2"><div><label style="margin-top:0">Edifício</label><select data-f="obra"><option value="">Todos</option>${obras.map(o => `<option value="${o.id}" ${filtro.obra === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></div>
       <div><label style="margin-top:0">Situação</label><select data-f="status"><option value="">Todas</option><option value="rascunho" ${filtro.status === 'rascunho' ? 'selected' : ''}>Rascunho</option><option value="emitido" ${filtro.status === 'emitido' ? 'selected' : ''}>Emitido</option></select></div>
       <div><label>De</label><input type="date" data-f="de" value="${filtro.de}"></div><div><label>Até</label><input type="date" data-f="ate" value="${filtro.ate}"></div></div>
-      <label>Buscar local ou obra</label><input data-f="q" type="search" value="${esc(filtro.q)}"></div>
-    <div class="seg"><button data-g="obra" class="${filtro.grupo === 'obra' ? 'on' : ''}">Agrupar por obra</button><button data-g="local" class="${filtro.grupo === 'local' ? 'on' : ''}">Agrupar por local visitado</button></div>
-    ${Object.keys(grupos).sort().map(k => { const g = grupos[k]; const ge = E.filter(e => g.some(v => v.id === e.vistoriaId)); return `<h3>${esc(k)} <span class="mut small">· ${g.length} vistoria(s) · ${ge.length} emissão(ões)</span></h3><div class="tw"><table><tr><th>Nº</th><th>${filtro.grupo === 'obra' ? 'Local' : 'Obra'}</th><th>Data</th><th>Situação</th><th>Fotos</th><th>Última emissão</th></tr>${g.map(v => { const le = E.find(e => e.vistoriaId === v.id); return `<tr data-go="#/vistoria/${v.id}" style="cursor:pointer"><td>${v.seq ? 'VT-' + pad(v.seq, 3) + '/' + v.ano : '—'}</td><td>${esc(filtro.grupo === 'obra' ? (v.local || '—') : (om[v.obraId]?.nome || '—'))}</td><td>${Rep.fData(v.data)}</td><td>${stChip(v)}</td><td>${v.nFotos || 0}</td><td>${le ? 'Rev. ' + pad(le.rev) + ' · ' + Rep.fTs(le.data).slice(0, 10) : '—'}</td></tr>`; }).join('')}</table></div>`; }).join('') || '<div class="empty">Nenhuma vistoria para os filtros.</div>'}
+      <label>Buscar local ou edifício</label><input data-f="q" type="search" value="${esc(filtro.q)}"></div>
+    <div class="seg"><button data-g="obra" class="${filtro.grupo === 'obra' ? 'on' : ''}">Agrupar por edifício</button><button data-g="local" class="${filtro.grupo === 'local' ? 'on' : ''}">Agrupar por local visitado</button></div>
+    ${Object.keys(grupos).sort().map(k => { const g = grupos[k]; const ge = E.filter(e => g.some(v => v.id === e.vistoriaId)); return `<h3>${esc(k)} <span class="mut small">· ${g.length} vistoria(s) · ${ge.length} emissão(ões)</span></h3><div class="tw"><table><tr><th>Nº</th><th>${filtro.grupo === 'obra' ? 'Local' : 'Edifício'}</th><th>Data</th><th>Situação</th><th>Fotos</th><th>Última emissão</th></tr>${g.map(v => { const le = E.find(e => e.vistoriaId === v.id); return `<tr data-go="#/vistoria/${v.id}" style="cursor:pointer"><td>${v.seq ? 'VT-' + pad(v.seq, 3) + '/' + v.ano : '—'}</td><td>${esc(filtro.grupo === 'obra' ? (v.local || '—') : (om[v.obraId]?.nome || '—'))}</td><td>${Rep.fData(v.data)}</td><td>${stChip(v)}</td><td>${v.nFotos || 0}</td><td>${le ? 'Rev. ' + pad(le.rev) + ' · ' + Rep.fTs(le.data).slice(0, 10) : '—'}</td></tr>`; }).join('')}</table></div>`; }).join('') || '<div class="empty">Nenhuma vistoria para os filtros.</div>'}
     <div class="row sp"><h2>Registro de emissões</h2><button class="btn sec sm" id="csv">Exportar CSV</button></div>
-    <div class="tw"><table><tr><th>Data/hora</th><th>Documento</th><th>Rev.</th><th>Tipo</th><th>Fmt</th><th>Obra · Local</th><th>Emitido por</th></tr>${E.slice(0, 80).map(e => `<tr><td>${Rep.fTs(e.data)}</td><td>${esc(e.numero)}</td><td>${pad(e.rev)}</td><td>${tipoNome(e.tipo, true)}</td><td>${e.formato.toUpperCase()}</td><td>${esc((om[e.obraId]?.nome || '') + ' · ' + (vm[e.vistoriaId]?.local || ''))}</td><td>${esc(e.usuario || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="mut">Sem emissões.</td></tr>'}</table></div>`;
+    <div class="tw"><table><tr><th>Data/hora</th><th>Documento</th><th>Rev.</th><th>Tipo</th><th>Fmt</th><th>Edifício · Local</th><th>Emitido por</th></tr>${E.slice(0, 80).map(e => `<tr><td>${Rep.fTs(e.data)}</td><td>${esc(e.numero)}</td><td>${pad(e.rev)}</td><td>${tipoNome(e.tipo, true)}</td><td>${e.formato.toUpperCase()}</td><td>${esc((om[e.obraId]?.nome || '') + ' · ' + (vm[e.vistoriaId]?.local || ''))}</td><td>${esc(e.usuario || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="mut">Sem emissões.</td></tr>'}</table></div>`;
   bindGo(view);
   view.querySelectorAll('[data-f]').forEach(el => el.onchange = () => { filtro[el.dataset.f] = el.value; route(); });
   view.querySelectorAll('[data-f="q"]').forEach(el => { el.onchange = null; el.onkeydown = e => { if (e.key === 'Enter') { filtro.q = el.value; route(); } }; el.onblur = () => { if (filtro.q !== el.value) { filtro.q = el.value; route(); } }; });
   view.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { filtro.grupo = b.dataset.g; route(); });
   $('#csv').onclick = () => {
-    const rows = [['Data/hora', 'Documento', 'Revisão', 'Tipo', 'Formato', 'Obra', 'Local', 'Arquivo', 'Emitido por'], ...E.map(e => [Rep.fTs(e.data), e.numero, pad(e.rev), e.tipo, e.formato, om[e.obraId]?.nome || '', vm[e.vistoriaId]?.local || '', e.arquivo, e.usuario || ''])];
+    const rows = [['Data/hora', 'Documento', 'Revisão', 'Tipo', 'Formato', 'Edifício', 'Local', 'Arquivo', 'Emitido por'], ...E.map(e => [Rep.fTs(e.data), e.numero, pad(e.rev), e.tipo, e.formato, om[e.obraId]?.nome || '', vm[e.vistoriaId]?.local || '', e.arquivo, e.usuario || ''])];
     baixar(new Blob(['﻿' + rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n')], { type: 'text/csv' }), `emissoes_CGU_${hoje()}.csv`);
   };
 }
@@ -481,7 +481,7 @@ async function exportBackup(obraId) {
   let first = true;
   for (const f of await DB.all('fotos')) { if (!vids.has(f.vistoriaId)) continue; const { blob, base, ...rest } = f; parts.push((first ? '' : ',') + JSON.stringify({ ...rest, data: await blobToData(blob), baseData: base ? await blobToData(base) : undefined })); first = false; }
   parts.push(']}');
-  baixar(new Blob(parts, { type: 'application/json' }), `CGU-Vistorias_backup_${obraId ? 'obra_' : ''}${hoje()}.json`);
+  baixar(new Blob(parts, { type: 'application/json' }), `CGU-Vistorias_backup_${obraId ? 'edificio_' : ''}${hoje()}.json`);
 }
 $('#impIn').addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = ''; if (!file) return;
@@ -493,7 +493,7 @@ $('#impIn').addEventListener('change', async e => {
     for (const x of d.emissoes) await DB.put('emissoes', x);
     for (const f of d.fotos) { const { data, baseData, ...rest } = f; const o = { ...rest, blob: await (await fetch(data)).blob() }; if (baseData) o.base = await (await fetch(baseData)).blob(); await DB.put('fotos', o); }
     for (const [ano, n] of Object.entries(d.seqs || {})) { const cur = await DB.getSetting('seq-' + ano, 0); if (n > cur) await DB.setSetting('seq-' + ano, n); }
-    toast(`Importado: ${d.obras.length} obra(s), ${d.vistorias.length} vistoria(s), ${d.fotos.length} foto(s)`, 4500); route();
+    toast(`Importado: ${d.obras.length} edifício(s), ${d.vistorias.length} vistoria(s), ${d.fotos.length} foto(s)`, 4500); route();
   } catch (err) { toast('Falha ao importar: ' + err.message, 5000); }
 });
 
