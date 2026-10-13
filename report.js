@@ -1,7 +1,7 @@
-/* ALL Vistorias — geração dos memoriais (Word e PDF) no padrão de identidade da ALL Engenharia Estrutural.
+/* CGU Vistorias — geração dos memoriais (Word e PDF) no padrão de identidade da Controladoria-Geral da União.
    Um único modelo de blocos alimenta os dois formatos. Roda 100% no aparelho. */
 const Rep = (() => {
-  const BLUE = '476AAA', DARK = '334F7D', INK = '2A344E', SOFT = 'EAF0F9', LINE = 'C5D0E6', MUTED = '5B6B88';
+  const BLUE = '002543', DARK = '002543', INK = '002543', SOFT = 'EAF4FA', LINE = 'CEDFE9', MUTED = '5B6B88';
   const GRAV = { 'Informativa': '6B7A99', 'Baixa': '2E8B57', 'Média': 'B7791F', 'Alta': 'D2691E', 'Crítica': 'C0392B' };
   const pad = (n, l = 2) => String(n).padStart(l, '0');
   const fData = d => { if (!d) return '—'; const [y, m, dd] = d.split('-'); return `${dd}/${m}/${y}`; };
@@ -10,6 +10,8 @@ const Rep = (() => {
     `Lat ${f.lat.toFixed(6)} / Lon ${f.lon.toFixed(6)}${f.acc ? ' (±' + Math.round(f.acc) + ' m)' : ''}`);
   const descF = f => (f.descricao || 'Sem descrição') + ((f.notas||[]).filter(n=>n.txt).length ? '  |  ' + f.notas.filter(n=>n.txt).map(n=>`(${n.n}) ${n.txt}`).join('; ') : '');
   const legenda = f => `${fTs(f.ts)} · ${fLoc(f)}`;
+  const fotoInfo = 'As imagens foram capturadas pela câmera ou importadas da galeria. As legendas indicam a data registrada pelo aplicativo e a localização quando disponível. Nas imagens importadas, a data corresponde à data do arquivo informada pelo aparelho, sem atribuição de coordenadas GPS.';
+  const orgInfo = (S, endereco = false) => [S.empresa.nome, S.empresa.cnpj && 'CNPJ ' + S.empresa.cnpj, endereco && S.empresa.endereco].filter(Boolean).join(' · ');
   const nn = n => pad(n);
 
   /* ---------- modelos ---------- */
@@ -72,7 +74,7 @@ const Rep = (() => {
     if (cons) {
       B.push({ t: 'pagebreak' });
       B.push({ t: 'h1', text: `${C.length ? 9 : 8}. REGISTRO FOTOGRÁFICO` });
-      B.push({ t: 'p', text: 'As fotografias a seguir foram registradas in loco por meio de aplicativo próprio, que associa a cada imagem a data, a hora e as coordenadas geográficas do aparelho no instante do registro.', small: true });
+      B.push({ t: 'p', text: fotoInfo, small: true });
       if (fotos.length) B.push({ t: 'photos', mh: 7.6, items: fotos.map((f, i) => ({ f, cap1: `Foto ${nn(i + 1)} – ${descF(f)}`, cap2: legenda(f) })) });
       else B.push({ t: 'p', text: 'Nenhuma foto registrada.' });
     } else {
@@ -94,7 +96,7 @@ const Rep = (() => {
       ['Total de fotos', String(fotos.length)],
       ['Responsável técnico', [S.rt.nome, S.rt.titulo, S.rt.crea && 'CREA ' + S.rt.crea].filter(Boolean).join(' · ') || '—'],
     ] });
-    B.push({ t: 'p', text: 'As fotografias a seguir foram registradas in loco por meio de aplicativo próprio, que associa a cada imagem a data, a hora e as coordenadas geográficas do aparelho no instante do registro.', small: true });
+    B.push({ t: 'p', text: fotoInfo, small: true });
     B.push({ t: 'photos', items: fotos.map((f, i) => ({ f, cap1: `Foto ${nn(i + 1)} – ${descF(f)}`, cap2: legenda(f) })) });
     B.push({ t: 'sign', city: 'Brasília-DF', data: fData(v.data), rt: S.rt });
     return { blocks: B, meta };
@@ -106,7 +108,7 @@ const Rep = (() => {
   /* ================= WORD ================= */
   async function toDocx(model, S, logo) {
     const D = docx, { blocks, meta } = model;
-    const FONT = 'Arial', CM = 37.795;
+    const FONT = 'Calibri', CM = 37.795;
     const A = D.AlignmentType;
     const run = (text, o = {}) => new D.TextRun({ text, font: FONT, size: o.size || 21, bold: o.bold, color: o.color || '222B3F', italics: o.italics, break: o.break });
     const lines = (text, o) => String(text).split('\n').map((l, i) => run(l, { ...o, break: i ? 1 : 0 }));
@@ -130,7 +132,7 @@ const Rep = (() => {
           cell([P([run(r[0], { bold: true, color: 'FFFFFF', size: 20 })], { after: 0 })], 2800, { fill: DARK }),
           cell([P(lines(r[1], { size: 21 }), { after: 0 })], W - 2800, { fill: SOFT })] })) }));
         out.push(P([run('')], { after: 200 }));
-        out.push(P([run(S.empresa.nome + ' · CNPJ ' + S.empresa.cnpj, { size: 17, color: MUTED })], { align: A.CENTER, after: 0, before: 600 }));
+        out.push(P([run(orgInfo(S), { size: 17, color: MUTED })], { align: A.CENTER, after: 0, before: 600 }));
         out.push(P([run(S.empresa.endereco, { size: 17, color: MUTED })], { align: A.CENTER, after: 0 }));
         out.push(P([run('')], { pb: true, after: 0 }));
       } else if (b.t === 'pagebreak') {
@@ -198,7 +200,7 @@ const Rep = (() => {
       cell([P([run(rightTxt, { size: 16, color: meta.draft ? 'C0392B' : MUTED, bold: meta.draft }), run('', {}), ], { align: A.RIGHT, after: 0 }),
             P([run(`${meta.obra} — ${meta.local || ''}`, { size: 16, color: MUTED })], { align: A.RIGHT, after: 0 })], W - 2900, { borders: { ...noB, bottom: { style: D.BorderStyle.SINGLE, size: 12, color: BLUE } }, v: D.VerticalAlign.BOTTOM })] })] })] });
     const footer = new D.Footer({ children: [
-      P([run(`${S.empresa.nome} · CNPJ ${S.empresa.cnpj} · ${S.empresa.endereco}`, { size: 14, color: MUTED })], { align: A.CENTER, after: 0, border: { top: { style: D.BorderStyle.SINGLE, size: 6, color: LINE, space: 4 } } }),
+      P([run(orgInfo(S, true), { size: 14, color: MUTED })], { align: A.CENTER, after: 0, border: { top: { style: D.BorderStyle.SINGLE, size: 6, color: LINE, space: 4 } } }),
       new D.Paragraph({ alignment: A.CENTER, children: [new D.TextRun({ children: ['Página ', D.PageNumber.CURRENT, ' de ', D.PageNumber.TOTAL_PAGES], font: FONT, size: 15, color: MUTED })] })] });
     const empty = new D.Header({ children: [new D.Paragraph('')] });
     const doc = new D.Document({
@@ -214,7 +216,7 @@ const Rep = (() => {
   async function toPdf(model, S, logo) {
     const L = PDFLib, { blocks, meta } = model;
     const pdf = await L.PDFDocument.create();
-    pdf.setTitle(`${meta.titulo} ${meta.numero}`); pdf.setAuthor(S.empresa.nome); pdf.setCreator('ALL Vistorias');
+    pdf.setTitle(`${meta.titulo} ${meta.numero}`); pdf.setAuthor(S.empresa.nome); pdf.setCreator('CGU Vistorias v' + CGU.version);
     const F = await pdf.embedFont(L.StandardFonts.Helvetica), FB = await pdf.embedFont(L.StandardFonts.HelveticaBold), FI = await pdf.embedFont(L.StandardFonts.HelveticaOblique);
     const logoImg = await pdf.embedPng(logo.bytes);
     const hex = h => L.rgb(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255);
@@ -315,7 +317,7 @@ const Rep = (() => {
         const sb = san(b.sub); page.drawText(sb, { x: (PW - F.widthOfTextAtSize(sb, 13)) / 2, y: cy, size: 13, font: F, color: hex(BLUE) }); cy -= 34;
         y = cy; const w0 = 140, widths = [w0, CW - w0];
         b.rows.forEach(r => drawRow([r[0], r[1]], widths, { size: 10, pad: 6, fills: [DARK, SOFT], bold: [true, false], colors: ['FFFFFF', null] }));
-        const f1 = san(S.empresa.nome + ' · CNPJ ' + S.empresa.cnpj), f2 = san(S.empresa.endereco);
+        const f1 = san(orgInfo(S)), f2 = san(S.empresa.endereco);
         page.drawText(f1, { x: (PW - F.widthOfTextAtSize(f1, 8.5)) / 2, y: 92, size: 8.5, font: F, color: hex(MUTED) });
         page.drawText(f2, { x: (PW - F.widthOfTextAtSize(f2, 8.5)) / 2, y: 80, size: 8.5, font: F, color: hex(MUTED) });
         np(); first = false;
@@ -370,7 +372,7 @@ const Rep = (() => {
         let r2s = r2; while (r2s.length > 4 && F.widthOfTextAtSize(r2s, 8) > CW - lw - 20) r2s = r2s.slice(0, -2);
         pg.drawText(r2s === r2 ? r2 : r2s + '…', { x: ML + CW - F.widthOfTextAtSize(r2s === r2 ? r2 : r2s + '…', 8), y: PH - 55, size: 8, font: F, color: hex(MUTED) });
         pg.drawLine({ start: { x: ML, y: PH - 64 }, end: { x: ML + CW, y: PH - 64 }, thickness: 1.6, color: hex(BLUE) });
-        const ft = san(`${S.empresa.nome} · CNPJ ${S.empresa.cnpj} · ${S.empresa.endereco}`), pn = `Página ${i + 1} de ${total}`;
+        const ft = san(orgInfo(S, true)), pn = `Página ${i + 1} de ${total}`;
         pg.drawLine({ start: { x: ML, y: 46 }, end: { x: ML + CW, y: 46 }, thickness: 0.6, color: hex(LINE) });
         pg.drawText(ft, { x: (PW - F.widthOfTextAtSize(ft, 7)) / 2, y: 36, size: 7, font: F, color: hex(MUTED) });
         pg.drawText(pn, { x: (PW - F.widthOfTextAtSize(pn, 7.5)) / 2, y: 25, size: 7.5, font: F, color: hex(MUTED) });

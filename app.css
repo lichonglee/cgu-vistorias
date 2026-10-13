@@ -1,6 +1,6 @@
-:root{--a:#476AAA;--b:#334F7D;--c:#2A344E;--soft:#EAF0F9;--line:#D5DDEC;--bg:#F4F6FA;--ink:#1d2536;--mut:#5B6B88;--ok:#2E8B57;--warn:#B7791F;--bad:#C0392B;--r:14px}
+:root{--a:#002543;--b:#002543;--c:#002543;--soft:#EAF4FA;--line:#D5DDEC;--bg:#F4F6FA;--ink:#1d2536;--mut:#5B6B88;--ok:#2E8B57;--warn:#B7791F;--bad:#C0392B;--r:14px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 Calibri,Carlito,"Segoe UI",Arial,sans-serif}
 body{padding-top:calc(56px + env(safe-area-inset-top));padding-bottom:calc(72px + env(safe-area-inset-bottom))}
 .top{position:fixed;top:0;left:0;right:0;z-index:20;height:calc(56px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 12px 0;background:var(--b);color:#fff;display:flex;align-items:center;gap:10px}
 .top .logo{height:30px;background:#fff;border-radius:6px;padding:3px 6px}
@@ -104,3 +104,18 @@ table{font-size:15px}th{font-size:13px}
 .ed-row i.on{border-color:#fff;box-shadow:0 0 0 3px var(--a)}
 .ed-hint{text-align:center;font-size:14px;color:#cdd7ee;min-height:20px}
 .numb{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#E02020;color:#fff;flex:none}
+
+/* Identidade CGU: azul base, curvas e selo digital do Manual2023. */
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;flex:none}
+.top .logo{height:46px;width:46px;background:none;padding:0;border-radius:50%}
+.version{font-size:13px;font-weight:700;letter-spacing:.2px;white-space:nowrap;border:1px solid #ffffff55;border-radius:6px;padding:3px 5px}
+.top{background:var(--b);border-bottom:3px solid #49ABE1;box-shadow:0 2px 12px #00254320}
+.top::after{content:"";position:absolute;right:0;bottom:0;width:100px;height:8px;background:#049B6F;border-radius:100% 0 0 0;pointer-events:none}
+.tabbar a.on{background:var(--soft)}
+.tabbar a[data-nav="manual"] svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round}
+.btn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;vertical-align:middle;margin-right:5px}
+.btn{font-family:inherit;font-weight:600}.seg button{font-family:inherit;font-weight:600;cursor:pointer}
+a:focus-visible,button:focus-visible{outline:3px solid #49ABE1;outline-offset:3px}
+.empty{background:linear-gradient(150deg,#fff,#EAF4FA);border:1px dashed var(--line);border-radius:18px;margin-top:8px}
+@media(max-width:480px){.top{gap:6px;padding-left:6px;padding-right:8px}.top .logo{width:40px;height:40px}.top h1{font-size:18px}.version{font-size:11px}.brand{gap:4px}.icon{min-width:34px;width:34px}.grid2:not(.keep){grid-template-columns:1fr}.row.wrap .btn{flex:1}.tabbar a{font-size:13px}}
+[hidden]{display:none!important}

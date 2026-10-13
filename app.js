@@ -1,4 +1,4 @@
-/* ALL Vistorias — aplicativo de campo + painel administrativo. Sem servidor: tudo roda e fica salvo no aparelho. */
+/* CGU Vistorias — aplicativo de campo + painel administrativo. Sem servidor: tudo roda e fica salvo no aparelho. */
 'use strict';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -12,8 +12,8 @@ const GRAVS = ['Informativa', 'Baixa', 'Média', 'Alta', 'Crítica'];
 const gravCls = g => ({ Informativa: 'mut', Baixa: 'ok', 'Média': 'warn', Alta: 'warn', 'Crítica': 'bad' }[g] || 'mut');
 const METOD = 'Inspeção visual realizada in loco, com registro fotográfico georreferenciado e datado, sem ensaios destrutivos.';
 const DEFAULTS = {
-  empresa: { nome: 'ALL Engenharia Estrutural', cnpj: '32.719.612/0001-25', endereco: 'CLN 206, Bloco A, Loja 03 – Asa Norte, Brasília-DF – CEP 70844-510', fone: '(61) 4515-1515', email: '' },
-  rt: { nome: 'Li Chong Lee Bacelar de Castro', titulo: '', crea: '' },
+  empresa: { nome: 'Controladoria-Geral da União', cnpj: '', endereco: '', fone: '', email: '' },
+  rt: { nome: '', titulo: '', crea: '' },
   usuario: '', carimbo: true, maxpx: 1600, pinHash: ''
 };
 let S = null, logo = null, token = 0, tab = 'dados';
@@ -111,7 +111,7 @@ async function photoSheet(id, fromCam) {
   const nums = [...new Set((f.marks || []).filter(m => m.t === 'num').map(m => m.n))].sort((x, y) => x - y);
   const el = modal(`<h2>Foto ${pad(n)}</h2><img class="big" src="${urlOf(f)}">
     <div class="mut small">🕒 ${Rep.fTs(f.ts)}<br>📍 ${Rep.fLoc(f)}${f.origem === 'galeria' ? '<br>(importada da galeria)' : ''}</div>
-    <button class="btn sec block" id="pmk" style="margin-top:10px">✏️ Marcar foto (seta, formas, números)</button>
+    <button class="btn sec block" id="pmk" style="margin-top:10px">${CGU.icon("pen")} Marcar foto (seta, formas, números)</button>
     <label>Descrição da foto (legenda)</label><textarea id="pd" rows="3" placeholder="Ex.: Fissura no pilar P12, 2º pavimento">${esc(f.descricao)}</textarea>
     ${nums.length ? `<label>Legenda dos números marcados</label>${nums.map(k => `<div class="row" style="margin-bottom:6px"><b class="numb">${k}</b><input class="pn" data-n="${k}" placeholder="O que é o ponto ${k}?" value="${esc((f.notas || []).find(x => x.n === k)?.txt || '')}"></div>`).join('')}` : ''}
     <div class="row wrap" style="margin-top:12px"><button class="btn grow" id="ps">Salvar</button>${fromCam ? '<button class="btn sec grow" id="pn">Salvar e nova foto</button>' : ''}</div>
@@ -241,7 +241,7 @@ function bindGo(root) { root.querySelectorAll('[data-go]').forEach(el => el.oncl
 function obraSheet(o) {
   const novo = !o; o = o || { id: DB.uid(), nome: '', cliente: '', endereco: '', contrato: '', art: '', criadoEm: Date.now() };
   const el = modal(`<h2>${novo ? 'Nova obra' : 'Editar obra'}</h2>
-    ${fld('Nome da obra *', 'nome', o, { ph: 'Ex.: Residencial Bellagio' })}${fld('Cliente / contratante', 'cliente', o)}${fld('Endereço da obra', 'endereco', o)}
+    ${fld('Nome da obra *', 'nome', o, { ph: 'Ex.: Reforma de unidade administrativa' })}${fld('Cliente / contratante', 'cliente', o)}${fld('Endereço da obra', 'endereco', o)}
     <div class="grid2">${fld('Contrato / proposta', 'contrato', o)}${fld('ART / RRT', 'art', o)}</div>
     <div class="row" style="margin-top:14px"><button class="btn grow" id="ok">Salvar</button><button class="btn ghost" id="x">Cancelar</button></div>`);
   bindFields(el, o, () => { });
@@ -303,8 +303,8 @@ async function vVistoria(view, id) {
     $('#dv').onclick = async () => { if (await confirmar('Excluir esta vistoria e suas fotos?')) { await DB.delVistoria(v.id); location.hash = '#/obra/' + o.id; } };
   }
   if (tab === 'fotos') {
-    tb.innerHTML = `<div class="row"><button class="btn grow" id="cam">📷 Tirar foto</button><button class="btn sec grow" id="gal">🖼 Da galeria</button></div>
-      <p class="mut small">Cada foto recebe data, hora e coordenadas GPS do momento do registro${S.carimbo ? ', também gravadas na própria imagem' : ''}. Permita a localização quando o aparelho pedir.</p>
+    tb.innerHTML = `<div class="row"><button class="btn grow" id="cam">${CGU.icon("camera")} Tirar foto</button><button class="btn sec grow" id="gal">${CGU.icon("image")} Da galeria</button></div>
+      <p class="mut small">Fotos da câmera recebem data e hora do registro e GPS quando disponível. Fotos da galeria usam a data do arquivo e não recebem GPS${S.carimbo ? ', também gravadas na própria imagem' : ''}. Permita a localização quando o aparelho pedir.</p>
       <div class="photos">${fotos.map((f, i) => `<div class="ph" data-p="${f.id}"><img src="${urlOf(f)}" loading="lazy"><b>${pad(i + 1)}</b><span class="gps">${f.lat != null ? '📍' : '—'}</span></div>`).join('')}</div>
       ${fotos.length ? '' : '<div class="empty">Nenhuma foto ainda.</div>'}`;
     $('#cam').onclick = () => startCapture(v.id, 'cam'); $('#gal').onclick = () => startCapture(v.id, 'gal');
@@ -403,9 +403,9 @@ const filtro = { obra: '', status: '', q: '', de: '', ate: '', grupo: 'obra' };
 async function sha(s) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
 async function vPainel(view) {
   setTitle('Painel administrativo', ''); setNav('painel');
-  if (S.pinHash && sessionStorage.getItem('all-adm') !== S.pinHash) {
+  if (S.pinHash && sessionStorage.getItem('cgu-adm') !== S.pinHash) {
     view.innerHTML = `<div class="pin card"><h2>Acesso restrito</h2><p class="mut small">Digite o PIN do painel</p><input id="pin" type="password" inputmode="numeric" maxlength="12" autofocus><button class="btn block" id="go" style="margin-top:12px">Entrar</button></div>`;
-    $('#go').onclick = async () => { if (await sha($('#pin').value) === S.pinHash) { sessionStorage.setItem('all-adm', S.pinHash); route(); } else toast('PIN incorreto'); };
+    $('#go').onclick = async () => { if (await sha($('#pin').value) === S.pinHash) { sessionStorage.setItem('cgu-adm', S.pinHash); route(); } else toast('PIN incorreto'); };
     $('#pin').onkeydown = e => { if (e.key === 'Enter') $('#go').click(); }; return;
   }
   const [obras, vs, ems] = await Promise.all([DB.all('obras'), DB.all('vistorias'), DB.all('emissoes')]);
@@ -433,7 +433,7 @@ async function vPainel(view) {
   view.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { filtro.grupo = b.dataset.g; route(); });
   $('#csv').onclick = () => {
     const rows = [['Data/hora', 'Documento', 'Revisão', 'Tipo', 'Formato', 'Obra', 'Local', 'Arquivo', 'Emitido por'], ...E.map(e => [Rep.fTs(e.data), e.numero, pad(e.rev), e.tipo, e.formato, om[e.obraId]?.nome || '', vm[e.vistoriaId]?.local || '', e.arquivo, e.usuario || ''])];
-    baixar(new Blob(['﻿' + rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n')], { type: 'text/csv' }), `emissoes_ALL_${hoje()}.csv`);
+    baixar(new Blob(['﻿' + rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n')], { type: 'text/csv' }), `emissoes_CGU_${hoje()}.csv`);
   };
 }
 
@@ -441,7 +441,7 @@ async function vPainel(view) {
 async function vAjustes(view) {
   setTitle('Ajustes', ''); setNav('ajustes');
   view.innerHTML = `
-    <div class="card"><h3 style="margin-top:0">Empresa (cabeçalho e rodapé dos documentos)</h3>${fld('Nome', 'empresa.nome', S)}${fld('CNPJ', 'empresa.cnpj', S)}${fld('Endereço', 'empresa.endereco', S)}<div class="grid2">${fld('Telefone', 'empresa.fone', S)}${fld('E-mail', 'empresa.email', S)}</div></div>
+    <div class="card"><h3 style="margin-top:0">Órgão / unidade (cabeçalho e rodapé dos documentos)</h3>${fld('Nome', 'empresa.nome', S)}${fld('CNPJ', 'empresa.cnpj', S)}${fld('Endereço', 'empresa.endereco', S)}<div class="grid2">${fld('Telefone', 'empresa.fone', S)}${fld('E-mail', 'empresa.email', S)}</div></div>
     <div class="card"><h3 style="margin-top:0">Responsável técnico (assinatura)</h3>${fld('Nome', 'rt.nome', S)}<div class="grid2">${fld('Título', 'rt.titulo', S, { ph: 'Ex.: Engenheiro Civil' })}${fld('CREA', 'rt.crea', S, { ph: 'Ex.: 12345/D-DF' })}</div></div>
     <div class="card"><h3 style="margin-top:0">Vistoriador (este aparelho)</h3>${fld('Seu nome (aparece no registro de emissões)', 'usuario', S)}
       <div class="sw"><input type="checkbox" data-f="carimbo" id="st" ${S.carimbo ? 'checked' : ''}><label for="st">Gravar data, hora e GPS na própria imagem</label></div>
@@ -451,9 +451,9 @@ async function vAjustes(view) {
     <div class="card"><h3 style="margin-top:0">Backup e consolidação</h3><p class="mut small">Os dados ficam só neste aparelho. Exporte o backup para guardar ou para reunir vistorias de vários celulares: ao importar, os registros são <b>mesclados</b>, sem apagar os existentes.</p>
       <div class="row wrap"><button class="btn sec grow" id="ex">Exportar tudo (.json)</button><button class="btn sec grow" id="im">Importar backup</button></div><div class="mut small" id="stg" style="margin-top:8px"></div></div>
     <div class="card" id="inst"><h3 style="margin-top:0">Instalar no celular</h3><p class="small">Android (Chrome): menu ⋮ → <b>Instalar app</b>.<br>iPhone (Safari): <b>Compartilhar</b> → <b>Adicionar à Tela de Início</b>.</p><button class="btn sm" id="ib" hidden>Instalar agora</button></div>
-    <p class="mut small" style="text-align:center">ALL Vistorias v1.0 · funciona sem internet após o primeiro acesso</p>`;
+    <p class="mut small" style="text-align:center">CGU Vistorias v${CGU.version} · funciona sem internet após o primeiro acesso</p>`;
   bindFields(view, S, () => saveSettings());
-  $('#sp').onclick = async () => { const p = $('#pin1').value; if (!/^\d{4,12}$/.test(p)) return toast('Use de 4 a 12 dígitos'); S.pinHash = await sha(p); sessionStorage.setItem('all-adm', S.pinHash); await saveSettings(); toast('PIN definido'); route(); };
+  $('#sp').onclick = async () => { const p = $('#pin1').value; if (!/^\d{4,12}$/.test(p)) return toast('Use de 4 a 12 dígitos'); S.pinHash = await sha(p); sessionStorage.setItem('cgu-adm', S.pinHash); await saveSettings(); toast('PIN definido'); route(); };
   const rp = $('#rp'); if (rp) rp.onclick = async () => { S.pinHash = ''; await saveSettings(); route(); };
   $('#ex').onclick = () => exportBackup(); $('#im').onclick = () => $('#impIn').click();
   if (deferredInstall) { $('#ib').hidden = false; $('#ib').onclick = () => { deferredInstall.prompt(); }; }
@@ -466,16 +466,16 @@ async function exportBackup(obraId) {
   if (obraId) { obras = obras.filter(o => o.id === obraId); vs = vs.filter(v => v.obraId === obraId); ems = ems.filter(e => e.obraId === obraId); }
   const vids = new Set(vs.map(v => v.id)); const seqs = {};
   for (const k of [new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1]) seqs[k] = await DB.getSetting('seq-' + k, 0);
-  const parts = [`{"app":"all-vistorias","v":1,"exportadoEm":${Date.now()},"seqs":${JSON.stringify(seqs)},"obras":${JSON.stringify(obras)},"vistorias":${JSON.stringify(vs)},"emissoes":${JSON.stringify(ems)},"fotos":[`];
+  const parts = [`{"app":"cgu-vistorias","v":1,"appVersion":"${CGU.version}","exportadoEm":${Date.now()},"seqs":${JSON.stringify(seqs)},"obras":${JSON.stringify(obras)},"vistorias":${JSON.stringify(vs)},"emissoes":${JSON.stringify(ems)},"fotos":[`];
   let first = true;
   for (const f of await DB.all('fotos')) { if (!vids.has(f.vistoriaId)) continue; const { blob, base, ...rest } = f; parts.push((first ? '' : ',') + JSON.stringify({ ...rest, data: await blobToData(blob), baseData: base ? await blobToData(base) : undefined })); first = false; }
   parts.push(']}');
-  baixar(new Blob(parts, { type: 'application/json' }), `ALL-Vistorias_backup_${obraId ? 'obra_' : ''}${hoje()}.json`);
+  baixar(new Blob(parts, { type: 'application/json' }), `CGU-Vistorias_backup_${obraId ? 'obra_' : ''}${hoje()}.json`);
 }
 $('#impIn').addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = ''; if (!file) return;
   try {
-    toast('Importando…'); const d = JSON.parse(await file.text()); if (d.app !== 'all-vistorias') throw new Error('arquivo inválido');
+    toast('Importando…'); const d = JSON.parse(await file.text()); if (!['cgu-vistorias', 'all-vistorias'].includes(d.app)) throw new Error('arquivo inválido');
     for (const o of d.obras) await DB.put('obras', o);
     for (const v of d.vistorias) { const cur = await DB.get('vistorias', v.id); if (!cur || (cur.updatedAt || 0) <= (v.updatedAt || 0)) await DB.put('vistorias', v); }
     for (const x of d.emissoes) await DB.put('emissoes', x);
@@ -491,6 +491,7 @@ window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferr
 (async () => {
   await DB.open(); await loadSettings(); await loadLogo();
   if (navigator.storage?.persist) navigator.storage.persist();
+  document.querySelector('#version').textContent = 'v' + CGU.version;
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
   route();
 })();

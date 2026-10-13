@@ -1,7 +1,7 @@
-/* ALL Vistorias — camada de dados local (IndexedDB). Tudo fica no próprio aparelho. */
+/* CGU Vistorias — camada de dados local (IndexedDB). Tudo fica no próprio aparelho. */
 const DB = (() => {
   let db;
-  const NAME = 'all-vistorias', VER = 1;
+  const NAME = 'cgu-vistorias', VER = 1;
   function open() {
     return new Promise((res, rej) => {
       const r = indexedDB.open(NAME, VER);
