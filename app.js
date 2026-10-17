@@ -104,6 +104,7 @@ function startCapture(vid, kind) {
   cap = { vid, pos: kind === 'cam' ? getPos() : Promise.resolve(null), kind, t0: Date.now() };
   (kind === 'cam' ? $('#camIn') : $('#galIn')).click();
 }
+const stampBh = (w, n) => { const fs = Math.max(13, Math.round(w * 0.021)); return Math.round(fs * 1.35) * n + Math.round(fs * 0.9); };
 async function drawStamp(ctx, w, h, lines) {
   const fs = Math.max(13, Math.round(w * 0.021)), lh = Math.round(fs * 1.35), bh = lh * lines.length + Math.round(fs * 0.9);
   ctx.fillStyle = 'rgba(42,52,78,.80)'; ctx.fillRect(0, h - bh, w, bh);
@@ -115,9 +116,10 @@ async function processImage(file, ts, pos, v) {
   let bmp; try { bmp = await createImageBitmap(file); } catch { bmp = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = URL.createObjectURL(file); }); }
   const sw = bmp.width, sh = bmp.height, r = Math.min(1, S.maxpx / Math.max(sw, sh)), w = Math.round(sw * r), h = Math.round(sh * r);
   const c = document.createElement('canvas'); c.width = w; c.height = h; const ctx = c.getContext('2d'); ctx.drawImage(bmp, 0, 0, w, h);
-  if (S.carimbo) await drawStamp(ctx, w, h, [Rep.fTs(ts) + '  ·  ' + (v.local || 'Local não informado'), Rep.fLoc(pos ? { lat: pos.lat, lon: pos.lon, acc: pos.acc } : {})]);
+  const stampLines = S.carimbo ? [Rep.fTs(ts) + '  ·  ' + (v.local || 'Local não informado'), Rep.fLoc(pos ? { lat: pos.lat, lon: pos.lon, acc: pos.acc } : {})] : null;
+  if (stampLines) await drawStamp(ctx, w, h, stampLines);
   const blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.84));
-  return { blob, w, h };
+  return { blob, w, h, stampLines };
 }
 async function addPhotos(files, kind) {
   const v = await DB.get('vistorias', cap.vid); if (!v) return;
@@ -126,8 +128,8 @@ async function addPhotos(files, kind) {
   for (const file of files) {
     const lm = file.lastModified, now = Date.now();
     const ts = kind === 'cam' ? (lm && Math.abs(now - lm) < 15 * 60000 ? lm : now) : (lm || now);
-    const { blob, w, h } = await processImage(file, ts, pos, v);
-    last = { id: DB.uid(), vistoriaId: v.id, blob, ts, lat: pos?.lat ?? null, lon: pos?.lon ?? null, acc: pos?.acc ?? null, descricao: '', origem: kind === 'cam' ? 'camera' : 'galeria', w, h };
+    const { blob, w, h, stampLines } = await processImage(file, ts, pos, v);
+    last = { id: DB.uid(), vistoriaId: v.id, blob, ts, lat: pos?.lat ?? null, lon: pos?.lon ?? null, acc: pos?.acc ?? null, descricao: '', origem: kind === 'cam' ? 'camera' : 'galeria', w, h, stampLines };
     await DB.put('fotos', last);
   }
   { const x = await DB.get('vistorias', v.id); x.nFotos = (await DB.by('fotos', 'vistoriaId', v.id)).length; await touchV(x); }
@@ -142,12 +144,14 @@ async function photoSheet(id, fromCam) {
   const nums = [...new Set((f.marks || []).filter(m => m.t === 'num').map(m => m.n))].sort((x, y) => x - y);
   const el = modal(`<h2>Foto ${pad(n)}</h2><img class="big" src="${urlOf(f)}">
     <div class="mut small">🕒 ${Rep.fTs(f.ts)}<br>📍 ${Rep.fLoc(f)}${f.origem === 'galeria' ? '<br>(importada da galeria)' : ''}</div>
+    <button class="btn sec block" id="pcr" style="margin-top:10px">✂ Recortar para caber na meia folha${f.cortada ? ' (já recortada)' : ''}</button>
     <button class="btn sec block" id="pmk" style="margin-top:10px">${CGU.icon("pen")} Marcar foto (seta, formas, números)</button>
     <label>Descrição da foto (legenda)</label><textarea id="pd" rows="3" placeholder="Ex.: Fissura no pilar P12, 2º pavimento">${esc(f.descricao)}</textarea>
     ${nums.length ? `<label>Legenda dos números marcados</label>${nums.map(k => `<div class="row" style="margin-bottom:6px"><b class="numb">${k}</b><input class="pn" data-n="${k}" placeholder="O que é o ponto ${k}?" value="${esc((f.notas || []).find(x => x.n === k)?.txt || '')}"></div>`).join('')}` : ''}
     <div class="row wrap" style="margin-top:12px"><button class="btn grow" id="ps">Salvar</button>${fromCam ? '<button class="btn sec grow" id="pn">Salvar e nova foto</button>' : ''}</div>
     <div class="row sp" style="margin-top:10px"><button class="btn bad sm" id="pdel">Excluir foto</button><button class="btn ghost sm" id="pc">Fechar</button></div>`);
   const save = async () => { f.descricao = $('#pd').value.trim(); f.notas = nums.map(k => ({ n: k, txt: (el.querySelector(`.pn[data-n="${k}"]`)?.value || '').trim() })); await DB.put('fotos', f); const v = await DB.get('vistorias', f.vistoriaId); await touchV(v); };
+  el.querySelector('#pcr').onclick = async () => { await save(); closeModal(); await recortarFoto(f); await route(); photoSheet(f.id, fromCam); };
   el.querySelector('#pmk').onclick = async () => { await save(); closeModal(); const ok = await editarMarcas(f); await route(); photoSheet(f.id, fromCam); };
   el.querySelector('#ps').onclick = async () => { await save(); closeModal(); route(); };
   const pn = el.querySelector('#pn'); if (pn) pn.onclick = async () => { await save(); closeModal(); await route(); startCapture(f.vistoriaId, 'cam'); };
@@ -227,6 +231,49 @@ function editarMarcas(f) {
         fresh.blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.86)); fresh.marks = marks;
         const used = new Set(marks.filter(m => m.t === 'num').map(m => m.n)); fresh.notas = (fresh.notas || []).filter(n => used.has(n.n));
       }
+      await DB.put('fotos', fresh); Object.assign(f, fresh); if (urls[f.id]) { URL.revokeObjectURL(urls[f.id]); delete urls[f.id]; }
+      const v = await DB.get('vistorias', f.vistoriaId); if (v) await touchV(v); sair(true);
+    };
+    redraw();
+  });
+}
+
+/* ---------- recorte para meia folha (fotos em dupla, retrato ou paisagem) ---------- */
+const RECORTES = { memorial: ['Meia folha – Memorial fotográfico (15,5 × 8,8 cm)', 15.5 / 8.8], dupla: ['Lado a lado – Relatório consolidado (7,9 × 5,9 cm)', 7.9 / 5.9] };
+function recortarFoto(f) {
+  return new Promise(async resolve => {
+    if ((f.marks || []).length && !await confirmar('Recortar remove as marcações desta foto (setas, formas, números). Continuar?')) return resolve(false);
+    const src = f.base || f.blob, bmp = await bmpOf(src), W = bmp.width, H = bmp.height;
+    const lines = f.stampLines || null, sb = lines ? stampBh(W, lines.length) : 0, HU = H - sb;
+    let ratio = RECORTES.memorial[1], z = 1, cw = 0, x = 0, y = 0, drag = null;
+    const ov = document.createElement('div'); ov.className = 'editor';
+    ov.innerHTML = `<div class="ed-top"><button class="btn ghost sm" id="rcx">Cancelar</button><b>Recortar foto</b><button class="btn sm" id="rcok">Aplicar</button></div>
+      <div class="ed-stage"><canvas id="rcc"></canvas></div>
+      <div class="ed-bar">
+        <select id="rcr" style="width:100%;margin-bottom:8px">${Object.entries(RECORTES).map(([k, v]) => '<option value="' + k + '">' + v[0] + '</option>').join('')}</select>
+        <div class="ed-row" style="flex-wrap:nowrap"><span style="font-size:14px">Zoom</span><input id="rcz" type="range" min="30" max="100" value="100" style="flex:1"></div>
+        <div class="ed-hint">Arraste o quadro para escolher o trecho. A foto ocupa a meia folha, em pé ou deitada.</div>
+      </div>`;
+    document.body.appendChild(ov);
+    const cv = ov.querySelector('#rcc'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d'); cv.style.touchAction = 'none';
+    const geom = () => { const max = Math.min(W, HU * ratio); cw = max * z; const ch = cw / ratio; x = Math.min(Math.max(0, x), W - cw); y = Math.min(Math.max(0, y), HU - ch); return ch; };
+    const redraw = () => { const ch = geom(); ctx.drawImage(bmp, 0, 0, W, H); ctx.fillStyle = 'rgba(0,0,0,.62)';
+      ctx.fillRect(0, 0, W, y); ctx.fillRect(0, y + ch, W, H - y - ch); ctx.fillRect(0, y, x, ch); ctx.fillRect(x + cw, y, W - x - cw, ch);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(3, W / 250); ctx.strokeRect(x, y, cw, ch); };
+    const pt = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; };
+    cv.onpointerdown = e => { e.preventDefault(); cv.setPointerCapture(e.pointerId); const p = pt(e); drag = { dx: p.x - x, dy: p.y - y }; };
+    cv.onpointermove = e => { if (!drag) return; const p = pt(e); x = p.x - drag.dx; y = p.y - drag.dy; redraw(); };
+    cv.onpointerup = cv.onpointercancel = () => { drag = null; };
+    ov.querySelector('#rcz').oninput = e => { const ch0 = cw / ratio, cx = x + cw / 2, cy = y + ch0 / 2; z = e.target.value / 100; const ch = Math.min(W, HU * ratio) * z / ratio; x = cx - Math.min(W, HU * ratio) * z / 2; y = cy - ch / 2; redraw(); };
+    ov.querySelector('#rcr').onchange = e => { ratio = RECORTES[e.target.value][1]; redraw(); };
+    const sair = v => { ov.remove(); resolve(v); };
+    ov.querySelector('#rcx').onclick = () => sair(false);
+    ov.querySelector('#rcok').onclick = async () => {
+      const ch = geom(), ow = Math.round(Math.min(cw, S.maxpx)), oh = Math.round(ow / ratio), c = document.createElement('canvas'); c.width = ow; c.height = oh;
+      const o = c.getContext('2d'); o.drawImage(bmp, x, y, cw, ch, 0, 0, ow, oh); if (lines) await drawStamp(o, ow, oh, lines);
+      const fresh = await DB.get('fotos', f.id) || f;
+      fresh.blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.86)); fresh.w = ow; fresh.h = oh; fresh.cortada = true;
+      delete fresh.base; delete fresh.marks; fresh.notas = [];
       await DB.put('fotos', fresh); Object.assign(f, fresh); if (urls[f.id]) { URL.revokeObjectURL(urls[f.id]); delete urls[f.id]; }
       const v = await DB.get('vistorias', f.vistoriaId); if (v) await touchV(v); sair(true);
     };

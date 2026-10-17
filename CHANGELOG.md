@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 1.0.5 · 17/10/2026
+
+- Recorte da foto para caber inteira na meia folha (fotos em dupla), em pé ou deitada, com zoom e escolha entre Memorial fotográfico e Relatório consolidado.
+- O carimbo de data, hora e local é redesenhado após o recorte.
+- Manual atualizado.
+
 ## 1.0.4 · 17/10/2026
 
 - Nova constatação com listas suspensas: tipo de constatação (manutenção predial, agrupado por sistema) e ambiente (áreas comuns de edificações institucionais).
