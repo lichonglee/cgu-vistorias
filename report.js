@@ -54,6 +54,8 @@ const Rep = (() => {
     if (!C.length) B.push({ t: 'p', text: 'Não foram registradas constatações específicas.' });
     C.forEach((c, i) => {
       B.push({ t: 'h2', text: `5.${i + 1}  ${c.titulo || 'Constatação'}`, tag: c.gravidade, tagColor: GRAV[c.gravidade] });
+      if (c.tipo) B.push({ t: 'p', label: 'Tipo: ', text: c.tipo });
+      if (c.ambiente) B.push({ t: 'p', label: 'Ambiente: ', text: c.ambiente });
       if (c.local) B.push({ t: 'p', label: 'Local/elemento: ', text: c.local });
       if (c.descricao) B.push({ t: 'p', label: 'Descrição: ', text: c.descricao });
       if (c.recomendacao) B.push({ t: 'p', label: 'Recomendação: ', text: c.recomendacao });
@@ -63,7 +65,7 @@ const Rep = (() => {
     if (C.length) {
       B.push({ t: 'h1', text: '6. QUADRO-RESUMO DAS CONSTATAÇÕES' });
       B.push({ t: 'table', head: ['Item', 'Constatação', 'Local/elemento', 'Gravidade', 'Fotos'], w: [0.07, 0.38, 0.22, 0.15, 0.18],
-        rows: C.map((c, i) => [`5.${i + 1}`, c.titulo || '—', c.local || '—', { text: c.gravidade || '—', color: GRAV[c.gravidade] },
+        rows: C.map((c, i) => [`5.${i + 1}`, c.titulo || '—', [c.ambiente, c.local].filter(Boolean).join(' – ') || '—', { text: c.gravidade || '—', color: GRAV[c.gravidade] },
           (c.fotoIds || []).map(id => idx[id]).filter(Boolean).sort((a, b) => a - b).map(nn).join(', ') || '—']) });
     }
     B.push({ t: 'h1', text: `${C.length ? 7 : 6}. CONCLUSÃO` });

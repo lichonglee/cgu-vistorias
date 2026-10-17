@@ -8,6 +8,26 @@ const agora = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d
 const slug = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'x';
 const TIPOS = ['Vistoria técnica de rotina', 'Vistoria de patologias / manifestações', 'Acompanhamento de execução', 'Recebimento de serviço', 'Vistoria cautelar / pré-obra', 'Pós-ocorrência', 'Outra'];
 const CLIMAS = ['Ensolarado', 'Nublado', 'Chuvoso', 'Chuva recente', 'Iluminação artificial'];
+const TIPOS_CONST = {
+  'Estrutura e vedações': ['Fissura / trinca em elemento estrutural', 'Corrosão de armadura / desplacamento de concreto', 'Deformação excessiva / flecha', 'Fissura em alvenaria / vedação', 'Descolamento de revestimento (argamassa, cerâmica)', 'Eflorescência / manchas em fachada'],
+  'Impermeabilização e umidade': ['Infiltração em laje / cobertura', 'Infiltração em parede / subsolo', 'Umidade ascendente', 'Mofo / bolor', 'Impermeabilização danificada'],
+  'Cobertura e drenagem': ['Telhas quebradas / deslocadas', 'Calhas, rufos e ralos obstruídos', 'Drenagem pluvial deficiente', 'Empoçamento de água'],
+  'Esquadrias e acabamentos': ['Esquadria com vedação deficiente / defeito', 'Vidro quebrado / trincado', 'Porta ou ferragem com defeito', 'Pintura deteriorada', 'Forro danificado / com mancha', 'Piso danificado / desnivelado', 'Guarda-corpo / corrimão inadequado'],
+  'Instalações elétricas': ['Quadro elétrico com defeito / sem identificação', 'Fiação exposta / improvisada', 'Luminária inoperante', 'Tomada / interruptor danificado', 'SPDA / aterramento com deficiência'],
+  'Instalações hidrossanitárias': ['Vazamento em tubulação', 'Louça / metal sanitário com defeito', 'Reservatório com limpeza / conservação deficiente', 'Esgoto entupido / mau cheiro', 'Falta de pressão / abastecimento'],
+  'Climatização, elevadores e outros': ['Ar-condicionado com defeito / sem manutenção', 'Exaustão / ventilação deficiente', 'Elevador com falha / sem manutenção', 'Gerador / no-break com defeito', 'Instalação de gás irregular'],
+  'Segurança, acessibilidade e conservação': ['Combate a incêndio irregular (extintor, hidrante, alarme)', 'Rota de fuga / saída de emergência obstruída', 'Sinalização de segurança ausente', 'Acessibilidade inadequada (rampa, piso tátil, banheiro)', 'Infestação (pragas, cupins)', 'Vegetação / raízes danificando a edificação', 'Limpeza / conservação deficiente', 'Irregularidade documental (AVCB, laudos, PMOC)'],
+  'Outros': ['Outra constatação']
+};
+const AMBIENTES = {
+  'Acesso e circulação': ['Fachada', 'Entrada / portaria / recepção', 'Hall', 'Corredor', 'Escada', 'Rampa', 'Elevador / poço', 'Estacionamento / garagem', 'Calçada / área externa'],
+  'Áreas de trabalho': ['Sala de trabalho / gabinete', 'Sala de reunião', 'Auditório', 'Biblioteca / arquivo', 'Atendimento ao público', 'Almoxarifado', 'Sala de TI / CPD / servidores'],
+  'Áreas de apoio': ['Copa / cozinha', 'Refeitório', 'Banheiro / sanitário', 'Vestiário', 'Depósito / DML', 'Lixo / resíduos'],
+  'Áreas técnicas': ['Casa de máquinas', 'Sala de quadros elétricos / subestação', 'Gerador', 'Reservatório / cisterna / casa de bombas', 'Central de ar-condicionado / ar-condicionado', 'Central de gás', 'Sala de bombas de incêndio'],
+  'Cobertura e subsolo': ['Cobertura / telhado', 'Laje de cobertura / terraço', 'Subsolo', 'Casa de máquinas de elevador (barrilete)'],
+  'Outros': ['Outro ambiente']
+};
+const optG = (G, sel) => '<option value="">— Selecione —</option>' + Object.entries(G).map(([g, l]) => '<optgroup label="' + g + '">' + l.map(t => '<option' + (t === sel ? ' selected' : '') + '>' + t + '</option>').join('') + '</optgroup>').join('');
 const GRAVS = ['Informativa', 'Baixa', 'Média', 'Alta', 'Crítica'];
 const gravCls = g => ({ Informativa: 'mut', Baixa: 'ok', 'Média': 'warn', Alta: 'warn', 'Crítica': 'bad' }[g] || 'mut');
 const METOD = 'Inspeção visual realizada in loco, com registro fotográfico georreferenciado e datado, sem ensaios destrutivos.';
@@ -324,7 +344,7 @@ async function vVistoria(view, id) {
   if (tab === 'const') {
     const C = v.constatacoes || [];
     tb.innerHTML = `<button class="btn block" id="nc">+ Nova constatação</button><p class="mut small">Registre cada achado com sua gravidade, recomendação e as fotos que o comprovam.</p>
-      ${C.map((c, i) => `<div class="card tap" data-c="${c.id}"><div class="row sp"><b>${pad(i + 1)}. ${esc(c.titulo || 'Sem título')}</b><span class="chip ${gravCls(c.gravidade)}">${esc(c.gravidade || '—')}</span></div><div class="mut small">${esc(c.local || '')}${(c.fotoIds || []).length ? ' · ' + c.fotoIds.length + ' foto(s)' : ''}</div></div>`).join('') || '<div class="empty">Nenhuma constatação.</div>'}`;
+      ${C.map((c, i) => `<div class="card tap" data-c="${c.id}"><div class="row sp"><b>${pad(i + 1)}. ${esc(c.titulo || 'Sem título')}</b><span class="chip ${gravCls(c.gravidade)}">${esc(c.gravidade || '—')}</span></div><div class="mut small">${esc([c.ambiente, c.local].filter(Boolean).join(' · '))}${(c.fotoIds || []).length ? ' · ' + c.fotoIds.length + ' foto(s)' : ''}</div></div>`).join('') || '<div class="empty">Nenhuma constatação.</div>'}`;
     $('#nc').onclick = () => constSheet(v, fotos);
     tb.querySelectorAll('[data-c]').forEach(e => e.onclick = () => constSheet(v, fotos, v.constatacoes.find(c => c.id === e.dataset.c)));
   }
@@ -335,14 +355,18 @@ async function vVistoria(view, id) {
   if (tab === 'emitir') await vEmitir(tb, v, o, fotos);
 }
 function constSheet(v, fotos, c) {
-  const novo = !c; c = c || { id: DB.uid(), titulo: '', gravidade: 'Informativa', local: '', descricao: '', recomendacao: '', fotoIds: [] };
+  const novo = !c; c = c || { id: DB.uid(), titulo: '', tipo: '', gravidade: 'Informativa', ambiente: '', local: '', descricao: '', recomendacao: '', fotoIds: [] };
   const el = modal(`<h2>${novo ? 'Nova constatação' : 'Constatação'}</h2>
+    <label>Tipo de constatação</label><select data-f="tipo" id="tp">${optG(TIPOS_CONST, c.tipo)}</select>
     ${fld('Título *', 'titulo', c, { ph: 'Ex.: Fissura em viga de transição' })}
     <label>Gravidade</label><select data-f="gravidade">${GRAVS.map(g => `<option ${g === c.gravidade ? 'selected' : ''}>${g}</option>`).join('')}</select>
-    ${fld('Local / elemento', 'local', c, { ph: 'Ex.: Pilar P12 – 2º pav.' })}${fld('Descrição', 'descricao', c, { area: 1, rows: 4 })}${fld('Recomendação', 'recomendacao', c, { area: 1, rows: 3 })}
+    <label>Ambiente</label><select data-f="ambiente">${optG(AMBIENTES, c.ambiente)}</select>
+    ${fld('Local / elemento (detalhe)', 'local', c, { ph: 'Ex.: Pilar P12 – 2º pav.' })}${fld('Descrição', 'descricao', c, { area: 1, rows: 4 })}${fld('Recomendação', 'recomendacao', c, { area: 1, rows: 3 })}
     <label>Fotos relacionadas (toque para marcar)</label><div class="photos" id="sp">${fotos.map((f, i) => `<div class="ph ${c.fotoIds.includes(f.id) ? 'sel' : ''}" data-id="${f.id}"><img src="${urlOf(f)}"><b>${pad(i + 1)}</b></div>`).join('') || '<span class="mut small">Tire fotos primeiro na aba Fotos.</span>'}</div>
     <div class="row" style="margin-top:14px"><button class="btn grow" id="ok">Salvar</button>${novo ? '' : '<button class="btn bad" id="dl">Excluir</button>'}<button class="btn ghost" id="x">Fechar</button></div>`);
+  let tipoAnt = c.tipo;
   bindFields(el, c, () => { });
+  el.querySelector('#tp').addEventListener('change', e => { const t = e.target.value, ti = el.querySelector('[data-f=titulo]'); if (t && ti && (!ti.value.trim() || ti.value === tipoAnt)) { ti.value = t; c.titulo = t; } tipoAnt = t; });
   el.querySelectorAll('[data-id]').forEach(p => p.onclick = () => { const id = p.dataset.id; c.fotoIds = c.fotoIds.includes(id) ? c.fotoIds.filter(x => x !== id) : [...c.fotoIds, id]; p.classList.toggle('sel'); });
   el.querySelector('#x').onclick = closeModal;
   el.querySelector('#ok').onclick = async () => { if (!c.titulo.trim()) return toast('Informe o título'); v.constatacoes = v.constatacoes || []; if (novo) v.constatacoes.push(c); await patchV(v.id, 'constatacoes', v.constatacoes); closeModal(); route(); };

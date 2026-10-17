@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## 1.0.4 · 17/10/2026
+
+- Nova constatação com listas suspensas: tipo de constatação (manutenção predial, agrupado por sistema) e ambiente (áreas comuns de edificações institucionais).
+- Tipo e ambiente aparecem no memorial e no quadro-resumo.
+
 ## 1.0.3 · 13/10/2026
 
 - Renomeia a área de Obras para Edifícios na interface, no Painel e nos relatórios.
