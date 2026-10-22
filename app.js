@@ -269,7 +269,7 @@ function recortarFoto(f, modo = 'crop') {
         const stampH = lines ? Math.min(ch, stampBh(cw, lines.length)) : 0;
         const photoH = Math.max(1, ch - stampH), sc = Math.min(cw / W, photoH / HU), dw = W * sc, dh = HU * sc;
         ctx.drawImage(bmp, 0, 0, W, HU, x + (cw - dw) / 2, y + (photoH - dh) / 2, dw, dh);
-        if (lines) drawStamp(ctx, cw, ch, lines);
+        if (lines) { ctx.save(); ctx.translate(x, y); drawStamp(ctx, cw, ch, lines); ctx.restore(); }
       }
       ctx.fillStyle = 'rgba(0,0,0,.62)';
       ctx.fillRect(0, 0, W, y); ctx.fillRect(0, y + ch, W, H - y - ch); ctx.fillRect(0, y, x, ch); ctx.fillRect(x + cw, y, W - x - cw, ch);
