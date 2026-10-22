@@ -293,7 +293,7 @@ function recortarFoto(f, modo = 'crop') {
       } else o.drawImage(bmp, x, y, cw, ch, 0, 0, ow, oh);
       if (lines) await drawStamp(o, ow, oh, lines);
       const fresh = await DB.get('fotos', f.id) || f;
-      if (!fresh.cropBackup) fresh.cropBackup = { blob: fresh.blob, base: fresh.base, marks: fresh.marks, notas: fresh.notas, w: fresh.w, h: fresh.h, cortada: fresh.cortada, ajustada: fresh.ajustada };
+      if (!fresh.cropBackup) fresh.cropBackup = { blob: fresh.blob, base: fresh.base, marks: fresh.marks, notas: fresh.notas, stampLines: fresh.stampLines, w: fresh.w, h: fresh.h, cortada: fresh.cortada, ajustada: fresh.ajustada };
       fresh.blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.86)); fresh.w = ow; fresh.h = oh;
       if (encaixar) { fresh.ajustada = true; delete fresh.cortada; } else { fresh.cortada = true; delete fresh.ajustada; }
       delete fresh.base; delete fresh.marks; fresh.notas = [];
@@ -312,6 +312,7 @@ async function desfazerRecorte(f) {
   for (const k of ['base', 'marks', 'notas', 'cortada', 'ajustada']) {
     if (Object.prototype.hasOwnProperty.call(backup, k)) fresh[k] = backup[k]; else delete fresh[k];
   }
+  if (Object.prototype.hasOwnProperty.call(backup, 'stampLines')) fresh.stampLines = backup.stampLines;
   delete fresh.cropBackup;
   await DB.put('fotos', fresh); Object.assign(f, fresh);
   if (urls[f.id]) { URL.revokeObjectURL(urls[f.id]); delete urls[f.id]; }
