@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 1.0.6 · 22/10/2026
+
+- Edição de fotos com recorte personalizado, ajuste para caber inteira e desfazer, preservando carimbo, marcações e legendas anteriores.
+- Manual HTML atualizado para refletir a versão publicada.
+
+
 ## 1.0.5 · 17/10/2026
 
 - Recorte da foto para caber inteira na meia folha (fotos em dupla), em pé ou deitada, com zoom e escolha entre Memorial fotográfico e Relatório consolidado.
