@@ -266,15 +266,17 @@ function recortarFoto(f, modo = 'crop') {
     const redraw = () => { const ch = geom(); ctx.drawImage(bmp, 0, 0, W, H);
       if (encaixar) {
         ctx.fillStyle = '#fff'; ctx.fillRect(x, y, cw, ch);
-        const sc = Math.min(cw / W, ch / HU), dw = W * sc, dh = HU * sc;
-        ctx.drawImage(bmp, 0, 0, W, HU, x + (cw - dw) / 2, y + (ch - dh) / 2, dw, dh);
+        const stampH = lines ? Math.min(ch, stampBh(cw, lines.length)) : 0;
+        const photoH = Math.max(1, ch - stampH), sc = Math.min(cw / W, photoH / HU), dw = W * sc, dh = HU * sc;
+        ctx.drawImage(bmp, 0, 0, W, HU, x + (cw - dw) / 2, y + (photoH - dh) / 2, dw, dh);
+        if (lines) drawStamp(ctx, cw, ch, lines);
       }
       ctx.fillStyle = 'rgba(0,0,0,.62)';
       ctx.fillRect(0, 0, W, y); ctx.fillRect(0, y + ch, W, H - y - ch); ctx.fillRect(0, y, x, ch); ctx.fillRect(x + cw, y, W - x - cw, ch);
       ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(3, W / 250); ctx.strokeRect(x, y, cw, ch); if (!encaixar) { const hs = Math.max(24, W / 28); ctx.fillStyle = '#fff'; ctx.fillRect(x + cw - hs, y + ch - hs, hs, hs); ctx.strokeStyle = '#333'; ctx.lineWidth = Math.max(2, W / 500); ctx.strokeRect(x + cw - hs, y + ch - hs, hs, hs); } };
     const pt = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; };
     cv.onpointerdown = e => { if (encaixar) return; e.preventDefault(); cv.setPointerCapture(e.pointerId); const p = pt(e), ch0 = custom ? customH : cw / ratio, h = Math.max(28, W / 32); const resize = p.x >= x + cw - h && p.y >= y + ch0 - h; drag = resize ? { resize: true, sx: p.x, sy: p.y, cw, ch: ch0, x, y } : { dx: p.x - x, dy: p.y - y }; };
-    cv.onpointermove = e => { if (!drag) return; const p = pt(e); if (drag.resize) { const nw = Math.max(W * .15, Math.min(W - drag.x, drag.cw + (p.x - drag.sx))); const nh = Math.max(HU * .15, Math.min(HU - drag.y, drag.ch + (p.y - drag.sy))); if (custom) { cw = nw; customH = nh; ratio = cw / customH; } else { const max = Math.min(W - drag.x, (HU - drag.y) * ratio); cw = Math.max(Math.min(W, HU * ratio) * .3, Math.min(max, drag.cw + ((p.x - drag.sx) + (p.y - drag.sy) * ratio) / 2)); } z = cw / Math.min(W, HU * ratio); x = drag.x; y = drag.y; ov.querySelector('#rcz').value = Math.round(z * 100); } else { x = p.x - drag.dx; y = p.y - drag.dy; } redraw(); };
+    cv.onpointermove = e => { if (!drag) return; const p = pt(e); if (drag.resize) { const nw = Math.max(W * .15, Math.min(W - drag.x, drag.cw + (p.x - drag.sx))); const nh = Math.max(HU * .15, Math.min(HU - drag.y, drag.ch + (p.y - drag.sy))); if (custom) { cw = nw; customH = nh; ratio = cw / customH; } else { const max = Math.min(W - drag.x, (HU - drag.y) * ratio); const min = Math.min(max, Math.min(W, HU * ratio) * .3); cw = Math.max(min, Math.min(max, drag.cw + ((p.x - drag.sx) + (p.y - drag.sy) * ratio) / 2)); } z = cw / Math.min(W, HU * ratio); x = drag.x; y = drag.y; ov.querySelector('#rcz').value = Math.round(z * 100); } else { x = p.x - drag.dx; y = p.y - drag.dy; } redraw(); };
     cv.onpointerup = cv.onpointercancel = () => { drag = null; };
     ov.querySelector('#rcz').oninput = e => { if (encaixar) return; z = e.target.value / 100; if (custom) { cw = W * .75 * z; customH = HU * .75 * z; ratio = cw / customH; x = (W - cw) / 2; y = (HU - customH) / 2; } else { const ch0 = cw / ratio, cx = x + cw / 2, cy = y + ch0 / 2; const ch = Math.min(W, HU * ratio) * z / ratio; x = cx - Math.min(W, HU * ratio) * z / 2; y = cy - ch / 2; } redraw(); };
     ov.querySelector('#rcr').onchange = e => { custom = e.target.value === 'custom'; if (!custom) ratio = RECORTES[e.target.value][1]; centralizar(); redraw(); };
@@ -285,8 +287,9 @@ function recortarFoto(f, modo = 'crop') {
       const o = c.getContext('2d');
       if (encaixar) {
         o.fillStyle = '#fff'; o.fillRect(0, 0, ow, oh);
-        const sc = Math.min(ow / W, oh / HU), dw = W * sc, dh = HU * sc;
-        o.drawImage(bmp, 0, 0, W, HU, (ow - dw) / 2, (oh - dh) / 2, dw, dh);
+        const stampH = lines ? stampBh(ow, lines.length) : 0, photoH = Math.max(1, oh - stampH);
+        const sc = Math.min(ow / W, photoH / HU), dw = W * sc, dh = HU * sc;
+        o.drawImage(bmp, 0, 0, W, HU, (ow - dw) / 2, (photoH - dh) / 2, dw, dh);
       } else o.drawImage(bmp, x, y, cw, ch, 0, 0, ow, oh);
       if (lines) await drawStamp(o, ow, oh, lines);
       const fresh = await DB.get('fotos', f.id) || f;
@@ -303,6 +306,8 @@ function recortarFoto(f, modo = 'crop') {
 async function desfazerRecorte(f) {
   const fresh = await DB.get('fotos', f.id) || f, backup = fresh.cropBackup;
   if (!backup) return false;
+  const newerAnnotations = (fresh.marks || []).length || (fresh.notas || []).some(n => String(n.txt || '').trim());
+  if (newerAnnotations && !await confirmar('Desfazer restaura as marcações e legendas originais. As marcações e legendas adicionadas após o ajuste serão substituídas. Continuar?')) return false;
   fresh.blob = backup.blob; fresh.w = backup.w; fresh.h = backup.h;
   for (const k of ['base', 'marks', 'notas', 'cortada', 'ajustada']) {
     if (Object.prototype.hasOwnProperty.call(backup, k)) fresh[k] = backup[k]; else delete fresh[k];
