@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 1.5.0 · 30/10/2026
+
+- Painel local substitui listas dimensionais por barras proporcionais que mantêm rótulos e contagens acessíveis; aviso de integridade destaca emissões não verificáveis e edições posteriores, explicando que rascunhos não entram.
+- Inclui aviso explícito de escopo monousuário: PIN local é barreira de interface, não autenticação institucional/RBAC.
+- Sem mudança no IndexedDB v3, backup ou snapshots. A versão mantém vínculos explícitos de recorrência da 1.4.0; o downgrade para 1.3.0 segue incompatível quando o campo aparece no backup.
+- Esta candidata segue sem aceite de release: PDF/manual, QA de navegador/dispositivo e gates institucionais continuam pendentes.
+
 ## 1.4.0 · 30/10/2026
 
 - Campo opcional `recorrenciaDeId` permite declarar vínculo humano explícito entre constatações; sem inferência automática por texto, edifício ou data. Novas emissões congelam o vínculo no snapshot e o backup v1 valida UUID e rejeita autorreferência.

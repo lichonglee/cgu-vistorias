@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const Analytics = require('../analytics.js');
 const SnapshotLib = require('../emission-snapshot.js');
 const Taxonomia = require('../taxonomia.js');
@@ -11,8 +12,8 @@ async function report({ obraId, vistoriaId, seq, rev, date, timestamp, findings 
   const photo = withPhoto ? { id: uid(), vistoriaId, blob: new Blob([new Uint8Array([255, 216, 255, 1])], { type: 'image/jpeg' }), ts: timestamp, lat: null, lon: null, descricao: 'SENSITIVE PHOTO NOTE', origem: 'camera', w: 2, h: 2, marks: [], notas: [] } : null;
   const vistoria = { id: vistoriaId, obraId, local: 'SENSITIVE LOCATION', tipo: 'Vistoria técnica de rotina', data: date, hora: '09:00', status: 'emitido', nFotos: photo ? 1 : 0, seq, ano: 2026, updatedAt: timestamp, gps: withGps ? { lat: -15.8, lon: -47.9, acc: 5 } : null, constatacoes: findings.map((f, i) => ({ id: f.id || uid(), ...(f.recorrenciaDeId ? { recorrenciaDeId: f.recorrenciaDeId } : {}), titulo: 'SENSITIVE FINDING', tipo: f.tipo, gravidade: f.gravidade, ambiente: f.ambiente, local: 'private', descricao: 'private', recomendacao: 'private', fotoIds: photo && i === 0 ? [photo.id] : [] })) };
   const emissaoId = uid();
-  const conteudo = await SnapshotLib.capturar({ obra, vistoria, fotos: photo ? [photo] : [], cfg: { empresa: { nome: 'private' }, rt: { nome: 'private' }, usuario: 'private' }, emissao: { tipo: 'tecnico', numero: { seq, ano: 2026 }, rev }, appVersion: '1.4.0' });
-  const snapshot = await SnapshotLib.criar({ id: uid(), emissaoId, formato: 'pdf', conteudo, appVersion: '1.4.0', criadoEm: timestamp });
+  const conteudo = await SnapshotLib.capturar({ obra, vistoria, fotos: photo ? [photo] : [], cfg: { empresa: { nome: 'private' }, rt: { nome: 'private' }, usuario: 'private' }, emissao: { tipo: 'tecnico', numero: { seq, ano: 2026 }, rev }, appVersion: '1.5.0' });
+  const snapshot = await SnapshotLib.criar({ id: uid(), emissaoId, formato: 'pdf', conteudo, appVersion: '1.5.0', criadoEm: timestamp });
   const emission = { id: emissaoId, vistoriaId, obraId, tipo: 'tecnico', formato: 'pdf', numero: `VT-${String(seq).padStart(3, '0')}/2026`, rev, data: timestamp, arquivo: `VT-${String(seq).padStart(3, '0')}-2026_Rev${String(rev).padStart(2, '0')}.pdf`, snapshotId: snapshot.id, snapshotHash: snapshot.hash };
   return { obra, vistoria, snapshot, emission };
 }
@@ -70,6 +71,7 @@ test('contrato local não calcula porcentagens nem percentuais artificiais quand
   const result = await Analytics.resumir({ snapshotLib: SnapshotLib });
   assert.deepEqual(result.kpis.coverage.numerator, 0);
   assert.deepEqual(result.kpis.coverage.denominator, 0);
+  assert.equal(result.kpis.recurrence.calculable,false);
   assert.equal(result.kpis.severeDensity.denominator, 0);
   assert.equal(result.scope.includes('Somente registros deste aparelho'), true);
 });
@@ -78,6 +80,27 @@ test('densidade acima de 100% é exibida como razão, sem símbolo de percentual
   const rendered = Analytics.formatDensity({ numerator: 5, denominator: 2 });
   assert.equal(rendered, '2,5 constatações por vistoria (5 / 2)');
   assert.equal(rendered.includes('%'), false);
+});
+
+test('barras dimensionais mantêm contagens exatas, largura proporcional e casos vazios/zero', () => {
+  assert.deepEqual(Analytics.formatDimensions([]),[]);
+  assert.deepEqual(Analytics.formatDimensions([{label:'Sem classificação',count:0},{label:'Alta',count:4},{label:'Baixa',count:2}]),[
+    {label:'Sem classificação',count:0,available:true,maximum:4,widthPct:0},{label:'Alta',count:4,available:true,maximum:4,widthPct:100},{label:'Baixa',count:2,available:true,maximum:4,widthPct:50}
+  ]);
+  assert.deepEqual(Analytics.formatDimensions([{label:'Zero',count:0}]),[{label:'Zero',count:0,available:true,maximum:1,widthPct:0}]);
+  assert.deepEqual(Analytics.formatDimensions([{label:'Inválida',count:-2}]),[{label:'Inválida',count:null,available:false,maximum:1,widthPct:0}]);
+  const css=fs.readFileSync(require.resolve('../app.css'),'utf8'),track='#e4eaf0';
+  const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);
+  const lum=h=>{const [r,g,b]=rgb(h);return .2126*r+.7152*g+.0722*b;};
+  const contrast=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+  for(const [,hex] of css.matchAll(/\.tone-[\w-]+\{background:#([0-9a-f]{6})\}/gi)){
+    assert.ok(contrast('#'+hex,track)>=3,hex+' bar contrast against track');
+  }
+  assert.ok(contrast('#172b3d','#ffffff')>=4.5,'dimension label contrast');
+  assert.ok(contrast('#541b16','#fff4f2')>=4.5,'integrity callout contrast');
+  const app=fs.readFileSync(require.resolve('../app.js'),'utf8');
+  assert.match(app,/Analytics\.formatDimensions\(xs\)/);assert.match(app,/role="meter"/);assert.match(app,/role="note"/);assert.match(app,/integrity-alert/);
+  assert.match(app,/Rascunhos e alterações posteriores só entram após uma nova emissão/);
 });
 
 test('recorrência conta só vínculos explícitos válidos, sem inferir pelo conteúdo', async () => {

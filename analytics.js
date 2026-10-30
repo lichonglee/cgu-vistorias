@@ -11,6 +11,11 @@
   const formatRatio = k => k.denominator ? `${k.numerator} / ${k.denominator} (${oneDecimal(k.numerator * 100 / k.denominator)}%)` : `${k.numerator} / 0 (sem base local)`;
   const formatDensity = k => k.denominator ? `${oneDecimal(k.numerator / k.denominator)} constatações por vistoria (${k.numerator} / ${k.denominator})` : `${k.numerator} / 0 (sem base local)`;
   const arr = v => Array.isArray(v) ? v : [];
+  const formatDimensions = rows => {
+    const normalized = arr(rows).map(x => { const available=Number.isSafeInteger(x?.count)&&x.count>=0; return { label: typeof x?.label === 'string' ? x.label : 'Sem classificação', count: available ? x.count : null, available }; });
+    const maximum = Math.max(1, ...normalized.filter(x=>x.available).map(x => x.count));
+    return normalized.map(x => ({ ...x, maximum, widthPct: x.available ? Math.round(x.count * 100 / maximum) : 0 }));
+  };
   const keyOf = v => typeof v === 'string' ? v : '';
   const compareText = (a, b) => a < b ? -1 : a > b ? 1 : 0;
   const countBy = (items, key) => {
@@ -205,5 +210,5 @@
     };
   }
 
-  return { resumir, summarizeActions, GRAVIDADES, formatRatio, formatDensity, periodFor };
+  return { resumir, summarizeActions, GRAVIDADES, formatRatio, formatDensity, formatDimensions, periodFor };
 });
