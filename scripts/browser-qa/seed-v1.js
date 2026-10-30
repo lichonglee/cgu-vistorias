@@ -1,0 +1,15 @@
+(async()=>{
+ if(location.hostname!=='127.0.0.1'||location.port!=='8767')throw Error('Fixture permitida apenas na origem de QA 8767');
+ const existing=(await indexedDB.databases()).find(d=>d.name==='cgu-vistorias');
+ if(existing&&existing.version!==1)throw Error('Banco já migrado: não substituir dados existentes');
+ const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('cgu-vistorias',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('obras',{keyPath:'id'});d.createObjectStore('vistorias',{keyPath:'id'}).createIndex('obraId','obraId');d.createObjectStore('fotos',{keyPath:'id'}).createIndex('vistoriaId','vistoriaId');d.createObjectStore('emissoes',{keyPath:'id'}).createIndex('vistoriaId','vistoriaId');d.createObjectStore('settings',{keyPath:'key'})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+ const ids={obra:crypto.randomUUID(),vistoria:crypto.randomUUID(),foto:crypto.randomUUID(),constatacao:crypto.randomUUID(),emissao:crypto.randomUUID()};
+ const ts=Date.now()-60000;
+ const canvas=document.createElement('canvas');canvas.width=32;canvas.height=32;const ctx=canvas.getContext('2d');ctx.fillStyle='#49abe1';ctx.fillRect(0,0,32,32);const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
+ const obra={id:ids.obra,nome:'Edifício fictício QA',cliente:'Unidade fictícia QA',endereco:'Endereço fictício — sem dado real',contrato:'QA-001',art:'QA-FICTICIA',criadoEm:ts};
+ const vistoria={id:ids.vistoria,obraId:ids.obra,local:'Sala fictícia QA',tipo:'Vistoria técnica de rotina',data:'2026-10-29',hora:'10:00',participantes:'Equipe fictícia QA',clima:'Ensolarado',objetivo:'Validar migração e emissão com dados fictícios',metodologia:'Fixture automatizada de QA',documentos:'QA-001',descricao:'Dados fictícios de verificação',constatacoes:[{id:ids.constatacao,titulo:'Constatação fictícia QA',tipo:'Outra constatação',gravidade:'Baixa',ambiente:'Outro ambiente',local:'Elemento fictício',descricao:'Sem dado real',recomendacao:'Verificar fixture',fotoIds:[ids.foto]}],conclusao:'Conclusão fictícia QA',recomendacoes:'Acompanhar fixture',status:'emitido',nFotos:1,gps:null,criadoEm:ts,updatedAt:ts,seq:1,ano:2026};
+ const foto={id:ids.foto,vistoriaId:ids.vistoria,ts,origem:'galeria',w:32,h:32,blob,base:blob,marks:[],descricao:'Imagem PNG fictícia QA',lat:null,lon:null,acc:null};
+ const emissao={id:ids.emissao,vistoriaId:ids.vistoria,obraId:ids.obra,tipo:'tecnico',formato:'pdf',numero:'VT-001/2026',rev:0,data:ts-1000,arquivo:'QA_LEGADO.pdf',usuario:'Usuario fictício QA'};
+ await new Promise((resolve,reject)=>{const t=db.transaction(['obras','vistorias','fotos','emissoes','settings'],'readwrite');t.objectStore('obras').put(obra);t.objectStore('vistorias').put(vistoria);t.objectStore('fotos').put(foto);t.objectStore('emissoes').put(emissao);t.objectStore('settings').put({key:'seq-2026',value:1});t.oncomplete=resolve;t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error)});
+ db.close();sessionStorage.setItem('qa-fixture',JSON.stringify(ids));return JSON.stringify({seededVersion:1,ids,photos:1,legacyEmissions:1});
+})()

@@ -1,6 +1,6 @@
 # Validação local da candidata
 
-Registro de trabalho em 29/10/2026, versão do registro 1.0.0. Resultados intermediários; não representam homologação ou aceite de produção.
+Registro de trabalho em 29/10/2026, versão do registro 1.0.1. Resultados intermediários; não representam homologação ou aceite de produção.
 
 ## Base e isolamento
 
@@ -20,3 +20,17 @@ Base `origin/main` c742fcbb44bcc24936169c1529fddde98545550d (1.0.6), confirmada 
 O commit af20ab2 não preservava os bytes do arquivo emitido. Foi solicitado e recebido complemento de Prisma (03c11b7), ainda sujeito a integração, revisão e nova rodada de navegador. O hash final inclui o envelope, portanto hashes de formatos diferentes podem diferir; a comparação de conteúdo entre formatos deve usar `hashConteudo`, não o hash do envelope.
 
 Refazer migração v1→v2 com o conjunto final de stores, recuperar o arquivo original após editar/excluir foto, conferir transações sob erro e import/export de snapshots/arquivos quando Farol concluir. Exercitar WebP no navegador e reabertura de PDF/DOCX além da assinatura. Não foram exercitados aparelho físico, câmera/GPS reais, compartilhamento nativo, abertura em Microsoft Word, isolamento multiunidade de backend nem restauração de serviço central.
+
+## Segunda rodada — 57c483b (Prisma 03c11b7) + imagens 738d736
+
+Preparada novamente a origem exclusiva de QA com uma fixture v1 conhecida; somente o banco fictício anterior dessa origem foi removido, após conferir o identificador do edifício. Aberta a candidata e realizada migração para v2, agora com `snapshots` e `arquivosEmitidos`.
+
+- Gerados novamente os seis formatos com PNG. PDFs reabertos por `PDFLib.PDFDocument.load`: VT com 3 páginas, MF com 2, RC com 4. Zero erro de incorporação de imagem.
+- DOCXs extraídos para `work/qa-artifacts` (fora da distribuição), reabertos como ZIP pelo .NET. Cada pacote contém 33 entradas e 2 imagens PNG, com `[Content_Types].xml`, `word/document.xml` e `word/styles.xml`. XML principal lido com DTD proibido. Não representa abertura no Microsoft Word.
+- Seis emissões novas, seis snapshots e seis arquivos emitidos persistidos; verificação de todos os snapshots e dos bytes dos arquivos passou.
+- `hashConteudo` coincide entre PDF/DOCX do mesmo tipo; hash do envelope pode diferir legitimamente por formato e identidade da emissão.
+- Edição posterior de constatação não alterou o snapshot. Exclusão temporária da foto fictícia não afetou a verificação do artefato histórico; a fixture de foto foi reposta para os próximos ensaios.
+- Tentativa de `registrarEmissao` com snapshot já existente causou erro e rollback: nenhuma emissão ou arquivo parcial foi gravado.
+- Emissão legada manteve estado `legado` explícito.
+
+As rotinas reproduzíveis estão em `scripts/browser-qa`. Os resultados sintéticos da rodada constam em `docs/qa/round2.json`. Importação/exportação segura ainda não foi integrada. Revisão de coerência dos metadados da emissão e reserva de numeração concorrente foi solicitada ao Prisma e deve ter outra rodada de navegador.
