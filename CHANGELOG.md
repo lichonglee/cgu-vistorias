@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 1.8.0 · 30/10/2026
+
+- Remove a API interna obsoleta e não atômica DB.nextSeq; emissões continuam usando somente reservarNumeracao, serializada por transação no IndexedDB deste aparelho.
+- Sem mudança de esquema IndexedDB v3, snapshots, backup ou dados persistidos. Teste negativo simula a antiga sequência get+set dentro do teste, sem expor o caminho inseguro pela API de produção.
+- Cache PWA versionado como 1.8.0. A candidata local continua sem aceite de release; QA visual e gates institucionais permanecem pendentes.
+
 ## 1.7.0 · 30/10/2026
 
 - Histórico de emissões permite comparar duas emissões verificadas da mesma vistoria com snapshots congelados. Constatações são relacionadas por ID; evidências são comparadas por SHA-256, sem depender dos IDs locais das fotos.

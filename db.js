@@ -256,10 +256,6 @@ const DB = (() => {
         }
         t.oncomplete=()=>resolve(result); t.onerror=()=>reject(t.error); t.onabort=()=>reject(t.error || new Error('Importação cancelada; nenhuma alteração foi gravada.'));
       });
-    },
-    async nextSeq(ano) {
-      const k = 'seq-' + ano; const n = (await this.getSetting(k, 0)) + 1;
-      await this.setSetting(k, n); return n;
     }
   };
 })();

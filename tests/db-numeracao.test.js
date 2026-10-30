@@ -12,6 +12,10 @@ const novaAba = (idb) => new Function('indexedDB', 'crypto', src + '; return DB;
 const nomeBanco = 'cgu-vistorias';
 const novoIdb = () => new fake.IDBFactory();   // banco isolado por teste
 const vist = (id, extra = {}) => ({ id, obraId: 'obra-0001', local: id, constatacoes: [], status: 'rascunho', ...extra });
+const nextSeqIngenuo = async (db, ano) => {
+  const key = 'seq-' + ano, next = (await db.getSetting(key, 0)) + 1;
+  await db.setSetting(key, next); return next;
+};
 
 test('Promise.all em abas distintas: vistorias diferentes recebem seq únicos e consecutivos', { skip }, async () => {
   const idb = novoIdb();
@@ -96,9 +100,10 @@ test('app.js: emitir usa reservarNumeracao (sem nextSeq nem get/put de seq fora 
   const corpo = app.slice(app.indexOf('async function emitir('), app.indexOf('function baixar('));
   assert.match(corpo, /DB\.reservarNumeracao\(vid, new Date\(\)\.getFullYear\(\)\)/);
   assert.doesNotMatch(corpo, /nextSeq|x\.seq = /);
+  assert.doesNotMatch(src, /nextSeq/, 'API insegura removida do banco de producao');
 });
-test('controle negativo: o nextSeq antigo (get+set separados) duplica números entre abas concorrentes', { skip }, async () => {
+test('controle negativo: a antiga lógica get+set separada duplica números entre abas concorrentes', { skip }, async () => {
   const idb = novoIdb(); const a = novaAba(idb), b = novaAba(idb); await a.open(); await b.open();
-  const ns = await Promise.all([a, b, a, b, a, b].map(d => d.nextSeq(2026)));
+  const ns = await Promise.all([a, b, a, b, a, b].map(d => nextSeqIngenuo(d, 2026)));
   assert.ok(new Set(ns).size < ns.length, 'esperado duplicar: ' + ns);   // documenta o defeito que reservarNumeracao corrige
 });
