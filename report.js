@@ -105,11 +105,35 @@ const Rep = (() => {
   }
 
   /* ---------- tamanho de imagem dentro de caixa ---------- */
+  function imageKind(bytes) {
+    if (!(bytes instanceof Uint8Array)) throw new Error('Imagem sem bytes válidos');
+    if (bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return 'jpg';
+    if (bytes.length >= 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((v, i) => bytes[i] === v)) return 'png';
+    if (bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP') return 'webp';
+    throw new Error('Formato de imagem não suportado no relatório');
+  }
+  async function prepareReportImage(f) {
+    const type = imageKind(f.bytes);
+    if (type !== 'webp') return { type, bytes: f.bytes };
+    /* Os geradores de PDF/Word não incorporam WebP diretamente. A conversão é só
+       para o documento: os bytes originais da foto e seu hash não são alterados. */
+    const bitmap = await createImageBitmap(new Blob([f.bytes], { type: 'image/webp' }));
+    try {
+      if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 40000000) throw new Error('Dimensões de imagem não suportadas');
+      const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height;
+      canvas.getContext('2d').drawImage(bitmap, 0, 0);
+      const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!png) throw new Error('Não foi possível converter imagem para o relatório');
+      return { type: 'png', bytes: new Uint8Array(await png.arrayBuffer()) };
+    } finally { bitmap.close(); }
+  }
   function fit(f, maxW, maxH) { const r = Math.min(maxW / f.w, maxH / f.h); return { w: f.w * r, h: f.h * r }; }
 
   /* ================= WORD ================= */
   async function toDocx(model, S, logo) {
     const D = docx, { blocks, meta } = model;
+    const images = new Map();
+    for (const block of blocks) if (block.t === 'grid' || block.t === 'photos') for (const item of block.items) if (!images.has(item.f)) images.set(item.f, await prepareReportImage(item.f));
     const FONT = 'Calibri', CM = 37.795;
     const A = D.AlignmentType;
     const run = (text, o = {}) => new D.TextRun({ text, font: FONT, size: o.size || 21, bold: o.bold, color: o.color || '222B3F', italics: o.italics, break: o.break });
@@ -121,7 +145,7 @@ const Rep = (() => {
     const noB = { top: none, bottom: none, left: none, right: none };
     const W = 9638; // dxa úteis (A4, margens 2 cm)
     const cell = (children, w, o = {}) => new D.TableCell({ children, width: { size: w, type: D.WidthType.DXA }, borders: o.borders || allB, shading: o.fill ? { type: D.ShadingType.CLEAR, fill: o.fill, color: 'auto' } : undefined, margins: { top: 70, bottom: 70, left: 110, right: 110 }, verticalAlign: o.v });
-    const img = (f, mw, mh) => { const s = fit(f, mw * CM, mh * CM); return new D.ImageRun({ type: 'jpg', data: f.bytes, transformation: { width: Math.round(s.w), height: Math.round(s.h) } }); };
+    const img = (f, mw, mh) => { const s = fit(f, mw * CM, mh * CM), image = images.get(f); return new D.ImageRun({ type: image.type, data: image.bytes, transformation: { width: Math.round(s.w), height: Math.round(s.h) } }); };
 
     const out = [];
     let firstPhoto = true, photoCount = 0;
@@ -296,7 +320,8 @@ const Rep = (() => {
     };
 
     const photoBox = async (it, x, top, mw, mh, capSize) => {
-      const im = await pdf.embedJpg(it.f.bytes); const s = fit(it.f, mw, mh);
+      const image = await prepareReportImage(it.f);
+      const im = image.type === 'png' ? await pdf.embedPng(image.bytes) : await pdf.embedJpg(image.bytes); const s = fit(it.f, mw, mh);
       const ix = x + (mw - s.w) / 2;
       page.drawRectangle({ x: ix - 0.5, y: top - s.h - 0.5, width: s.w + 1, height: s.h + 1, borderColor: hex(LINE), borderWidth: 0.6 });
       page.drawImage(im, { x: ix, y: top - s.h, width: s.w, height: s.h });
@@ -383,5 +408,5 @@ const Rep = (() => {
     return new Blob([await pdf.save()], { type: 'application/pdf' });
   }
 
-  return { buildTecnico, buildFotografico, buildConsolidado, toDocx, toPdf, fTs, fLoc, fData, legenda, GRAV };
+  return { buildTecnico, buildFotografico, buildConsolidado, toDocx, toPdf, fTs, fLoc, fData, legenda, GRAV, imageKind, prepareReportImage };
 })();
