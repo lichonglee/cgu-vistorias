@@ -51,15 +51,77 @@
   };
   const hasGps = gps => gps && Number.isFinite(gps.lat) && gps.lat >= -90 && gps.lat <= 90 && Number.isFinite(gps.lon) && gps.lon >= -180 && gps.lon <= 180;
 
+  const findingKey = (vistoriaId, constatacaoId) => JSON.stringify([vistoriaId, constatacaoId]);
+  function selectedFindings(migrationRecords = [], snapshots = []) {
+    const snapshotById = new Map(arr(snapshots).filter(s => s?.id).map(s => [s.id, s]));
+    const eligible = new Map(), recordsByInspection = new Map(), ambiguousInspections = new Set();
+    for (const record of arr(migrationRecords)) {
+      if (!record?.vistoriaId || !record?.snapshotId) continue;
+      const previous = recordsByInspection.get(record.vistoriaId);
+      if (previous) {
+        if (previous.snapshotId !== record.snapshotId) ambiguousInspections.add(record.vistoriaId);
+        continue;
+      }
+      recordsByInspection.set(record.vistoriaId, record);
+    }
+    for (const [vistoriaId, record] of recordsByInspection) {
+      if (ambiguousInspections.has(vistoriaId)) continue;
+      const snapshot = snapshotById.get(record.snapshotId);
+      if (!snapshot?.conteudo) continue;
+      const work = snapshot.conteudo.obra || {};
+      for (const finding of arr(snapshot.conteudo.constatacoes)) {
+        if (typeof finding?.id !== 'string' || !finding.id) continue;
+        eligible.set(findingKey(record.vistoriaId, finding.id), { record, snapshot, work, finding });
+      }
+    }
+    return eligible;
+  }
   function summarizeActions(migrationRecords = [], snapshots = [], actions = [], { asOf, now = Date.now() } = {}) {
-    const snapshotById=new Map(arr(snapshots).filter(s=>s?.id).map(s=>[s.id,s])), eligible=new Map();
-    for(const record of arr(migrationRecords)){const sn=snapshotById.get(record.snapshotId);for(const finding of arr(sn?.conteudo?.constatacoes))eligible.set(`${record.vistoriaId}|${finding?.id}`,finding);}
-    const key=a=>`${a?.vistoriaId}|${a?.constatacaoId}`;
-    const scoped=arr(actions).filter(a=>eligible.has(key(a))),active=scoped.filter(a=>a.estado==='aberta'||a.estado==='em-execucao'),completed=scoped.filter(a=>a.estado==='concluida'),declared=scoped.filter(a=>a.estado!=='cancelada');
-    const highCritical=[...eligible].filter(([,c])=>c?.gravidade==='Alta'||c?.gravidade==='Crítica');
-    const highCriticalWithoutAction=highCritical.filter(([k])=>!scoped.some(a=>key(a)===k&&a.estado!=='cancelada')).length;
-    const today=validDate(asOf)||periodFor(null,null).asOf;
-    return {completed:completed.length,declared:declared.length,active:active.length,cancelled:scoped.filter(a=>a.estado==='cancelada').length,overdue:active.filter(a=>typeof a.prazo==='string'&&a.prazo<today).length,aging30:active.filter(a=>Number.isFinite(a.criadoEm)&&now-a.criadoEm>30*86400000).length,highCriticalWithoutAction,highCriticalTotal:highCritical.length};
+    const eligible = selectedFindings(migrationRecords, snapshots), scoped = arr(actions).filter(a => eligible.has(findingKey(a?.vistoriaId, a?.constatacaoId)));
+    const active = scoped.filter(a => a.estado === 'aberta' || a.estado === 'em-execucao'), completed = scoped.filter(a => a.estado === 'concluida'), declared = scoped.filter(a => a.estado !== 'cancelada');
+    const highCritical = [...eligible].filter(([, item]) => item.finding?.gravidade === 'Alta' || item.finding?.gravidade === 'Crítica');
+    const actionsByFinding = new Map();
+    for (const action of scoped) {
+      const key = findingKey(action.vistoriaId, action.constatacaoId);
+      if (!actionsByFinding.has(key)) actionsByFinding.set(key, []);
+      actionsByFinding.get(key).push(action);
+    }
+    const highCriticalWithoutAction = highCritical.filter(([key]) => !(actionsByFinding.get(key) || []).some(a => a.estado !== 'cancelada')).length;
+    const today = validDate(asOf) || periodFor(null, null).asOf;
+    const overdue = action => Boolean(validDate(action.prazo) && action.prazo < today);
+    const aging = action => Number.isFinite(action.criadoEm) && now - action.criadoEm > 30 * 86400000;
+    return { completed: completed.length, declared: declared.length, active: active.length, cancelled: scoped.filter(a => a.estado === 'cancelada').length, overdue: active.filter(overdue).length, aging30: active.filter(aging).length, highCriticalWithoutAction, highCriticalTotal: highCritical.length };
+  }
+  function listFollowUp(migrationRecords = [], snapshots = [], actions = [], { asOf, now = Date.now() } = {}) {
+    const eligible = selectedFindings(migrationRecords, snapshots), today = validDate(asOf) || periodFor(null, null).asOf;
+    const actionsByFinding = new Map();
+    for (const action of arr(actions)) {
+      const key = findingKey(action?.vistoriaId, action?.constatacaoId);
+      if (!eligible.has(key)) continue;
+      if (!actionsByFinding.has(key)) actionsByFinding.set(key, []);
+      actionsByFinding.get(key).push(action);
+    }
+    const output = [];
+    for (const [key, item] of eligible) {
+      const { record, snapshot, work, finding } = item, linked = actionsByFinding.get(key) || [];
+      const base = { constatacaoId: finding.id, vistoriaId: record.vistoriaId, snapshotId: record.snapshotId, edificio: String(work.nome || ''), titulo: String(finding.titulo || 'Sem título'), gravidade: GRAVIDADES.includes(finding.gravidade) ? finding.gravidade : 'Sem classificação' };
+      if ((finding.gravidade === 'Alta' || finding.gravidade === 'Crítica') && !linked.some(a => a.estado !== 'cancelada')) output.push({ ...base, actionId: '', motivo: 'sem_acao', prazo: '' });
+      for (const action of linked) {
+        if (action.estado !== 'aberta' && action.estado !== 'em-execucao') continue;
+        const common = { ...base, actionId: String(action.id || ''), prazo: validDate(action.prazo) || '' };
+        if (common.prazo && common.prazo < today) output.push({ ...common, motivo: 'vencida' });
+        if (Number.isFinite(action.criadoEm) && now - action.criadoEm > 30 * 86400000) output.push({ ...common, motivo: 'aberta_30d' });
+      }
+    }
+    const reasonOrder = { vencida: 0, aberta_30d: 1, sem_acao: 2 }, severityOrder = new Map([['Crítica', 0], ['Alta', 1], ['Média', 2], ['Baixa', 3], ['Informativa', 4], ['Sem classificação', 5]]);
+    return output.sort((a, b) => reasonOrder[a.motivo] - reasonOrder[b.motivo] || severityOrder.get(a.gravidade) - severityOrder.get(b.gravidade) || compareText(a.prazo || '9999-12-31', b.prazo || '9999-12-31') || compareText(a.vistoriaId, b.vistoriaId) || compareText(a.constatacaoId, b.constatacaoId) || compareText(a.actionId, b.actionId));
+  }
+  function pageFollowUp(items = [], motivo = '', page = 0, pageSize = 50) {
+    const size = Number.isSafeInteger(pageSize) && pageSize > 0 ? pageSize : 50;
+    const filtered = arr(items).filter(item => !motivo || item?.motivo === motivo);
+    const pages = Math.max(1, Math.ceil(filtered.length / size));
+    const currentPage = Math.max(0, Math.min(Number.isSafeInteger(page) ? page : 0, pages - 1));
+    return { items: filtered.slice(currentPage * size, (currentPage + 1) * size), total: filtered.length, page: currentPage, pageSize: size, pages };
   }
 
   async function resumir({ obras = [], vistorias = [], emissoes = [], snapshots = [], snapshotLib, sistemaPorTipo = {}, grupoPorAmbiente = {}, taxonomia, asOf, janelaMeses = null } = {}) {
@@ -210,5 +272,5 @@
     };
   }
 
-  return { resumir, summarizeActions, GRAVIDADES, formatRatio, formatDensity, formatDimensions, periodFor };
+  return { resumir, summarizeActions, listFollowUp, pageFollowUp, GRAVIDADES, formatRatio, formatDensity, formatDimensions, periodFor };
 });

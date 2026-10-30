@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 1.6.0 · 30/10/2026
+
+- Painel local acrescenta fila paginada de acompanhamento, filtrável por ação vencida, aberta há mais de 30 dias e constatação Alta/Crítica sem ação declarada; cada item navega até a constatação.
+- A fila reconcilia cada motivo com os contadores de ações e considera somente constatações do último snapshot verificável na janela. Ações concluídas/canceladas não aparecem como abertas/vencidas; cancelamento não equivale a ação declarada para o KPI de Alta/Crítica sem ação.
+- A lista é somente leitura, sem exportação, notificação ou atribuição de responsabilidade. Dados de recorrência ausentes não são chamados de “não avaliados”; ausência de vínculo não prova que a avaliação ocorreu. Nenhum score de risco é calculado.
+- Sem mudança no IndexedDB v3, snapshot, backup ou rede. O manual HTML descreve a fila; o PDF/capturas seguem pendentes de regeneração.
+- Versão ainda candidata local; QA visual em navegador/dispositivo e gates institucionais continuam pendentes.
+
 ## 1.5.0 · 30/10/2026
 
 - Painel local substitui listas dimensionais por barras proporcionais que mantêm rótulos e contagens acessíveis; aviso de integridade destaca emissões não verificáveis e edições posteriores, explicando que rascunhos não entram.

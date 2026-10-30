@@ -32,10 +32,14 @@ test('a distribuição usa X.Y.Z consistente no produto, HTML e manifesto de fer
  assert.ok(manual.includes('achados anteriores verificados do mesmo edifício'));
  assert.ok(manual.includes('não infere pelo texto'));
  assert.ok(manual.includes('As dimensões aparecem como barras com contagens e rótulos'));
+ assert.ok(manual.includes('Itens para acompanhamento'));
+ assert.ok(manual.includes('não projete em tela pública ou TV'));
  assert.ok(manual.includes('O PIN é barreira de interface, não acesso institucional'));
  assert.match(read('db.js'),/NAME = 'cgu-vistorias', VER = 3/);
  assert.ok(read('CHANGELOG.md').includes('rowVersion'));
  assert.ok(read('CHANGELOG.md').includes('## 1.4.0 · 30/10/2026'));
+ assert.ok(read('CHANGELOG.md').includes('## 1.6.0 \u00b7 30/10/2026'));
+ assert.ok(read('CHANGELOG.md').includes('A fila reconcilia cada motivo com os contadores de a\u00e7\u00f5es'));
  assert.ok(read('CHANGELOG.md').includes('## 1.5.0 · 30/10/2026'));
  assert.ok(read('CHANGELOG.md').includes('A versão 1.3.0 rejeita o novo campo opcional'));
  assert.ok(manual.includes('responsável técnico/CREA e usuário) são incluídos nos snapshots'));

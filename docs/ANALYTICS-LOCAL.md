@@ -33,3 +33,10 @@ O painel não expõe nomes, descrições, recomendações, coordenadas ou fotos 
 ## Evolução para painel central
 
 A consolidação exige serviço autenticado, IDs e taxonomia institucional, inventário autoritativo, autorização por unidade no servidor, regras de revisão/reconciliação, política aprovada de retenção e supressão de grupos pequenos. Aprovar também rubrica de risco com responsáveis técnicos. Nenhuma métrica local deve ser apresentada como carteira consolidada.
+
+
+## Fila local de acompanhamento
+
+A área de ações declaradas locais oferece uma fila paginada e filtrável por três motivos: ação aberta vencida, ação aberta há mais de 30 dias e constatação Alta/Crítica sem ação não cancelada. Cada linha referencia título e edifício do snapshot local, IDs da vistoria/constatação para navegação, motivo e prazo declarado quando aplicável. A lista usa as mesmas `migrationRecords` selecionadas pelo resumo: apenas o último snapshot verificável por vistoria dentro da janela; rascunhos, emissões ausentes/divergentes e snapshots substituídos ficam de fora. Um mesmo registro pode aparecer em motivos diferentes, e a soma de cada motivo reconcilia com seu contador.
+
+A lista é somente leitura e não exporta conteúdo, não registra visualizações e não cria obrigações. Título e edifício podem conter dados restritos e permanecem no aparelho; a interface escapa conteúdo antes de renderizar. Ausência de `recorrenciaDeId` não é classificada como “não avaliada”, pois o esquema não registra essa decisão. Nenhum score de risco é calculado.

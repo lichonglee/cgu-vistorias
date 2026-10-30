@@ -30,13 +30,14 @@ const AMBIENTES = {
 const optG = (G, sel) => '<option value="">— Selecione —</option>' + Object.entries(G).map(([g, l]) => '<optgroup label="' + esc(g) + '">' + l.map(t => '<option value="' + esc(t) + '"' + (t === sel ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</optgroup>').join('');
 const GRAVS = ['Informativa', 'Baixa', 'Média', 'Alta', 'Crítica'];
 const gravCls = g => ({ Informativa: 'mut', Baixa: 'ok', 'Média': 'warn', Alta: 'warn', 'Crítica': 'bad' }[g] || 'mut');
+function decodeRouteSegment(segment) { if (!segment) return segment; try { return decodeURIComponent(segment); } catch { return null; } }
 const METOD = 'Inspeção visual realizada in loco, com registro fotográfico georreferenciado e datado, sem ensaios destrutivos.';
 const DEFAULTS = {
   empresa: { nome: 'Controladoria-Geral da União', cnpj: '26.664.015/0001-48', endereco: 'SAUS, Quadra 5, Bloco A, Lotes 9 e 10, Edifício MultiBrasil, Asa Sul, Brasília/DF - CEP 70070-050', fone: '(61) 2020-6831', email: 'cglpe.cogea@cgu.gov.br' },
   rt: { nome: 'Li Chong Lee Bacelar de Castro', titulo: 'Coordenador de Engenharia e Arquitetura - COGEA', crea: '12158 DF' },
   usuario: '', carimbo: true, maxpx: 1600, pinHash: ''
 };
-let S = null, logo = null, token = 0, tab = 'dados';
+let S = null, logo = null, token = 0, tab = 'dados', pendingFollowUpFindingId = '';
 const urls = {};
 const urlOf = f => urls[f.id] || (urls[f.id] = URL.createObjectURL(f.blob));
 const byTs = (a, b) => a.ts - b.ts;
@@ -327,9 +328,11 @@ async function doRoute() {
   const my = token; const h = location.hash.replace(/^#\/?/, '').split('/');
   const view = $('#view'); const R = h[0] || 'obras';
   try {
+    const routeId = decodeRouteSegment(h[1]);
+    if (h[1] && routeId === null) { location.hash = '#/'; return; }
     if (R === 'obras') await vObras(view, my);
-    else if (R === 'obra') await vObra(view, h[1], my);
-    else if (R === 'vistoria') await vVistoria(view, h[1], my);
+    else if (R === 'obra') await vObra(view, routeId, my);
+    else if (R === 'vistoria') await vVistoria(view, routeId, my);
     else if (R === 'painel') await vPainel(view, my);
     else if (R === 'ajustes') await vAjustes(view, my);
     else location.hash = '#/';
@@ -397,7 +400,7 @@ const stChip = v => v.status === 'emitido' ? '<span class="chip ok">Emitido</spa
 
 /* ---------- VISTORIA ---------- */
 async function vVistoria(view, id) {
-  const v = await DB.get('vistorias', id); if (!v) return location.hash = '#/';
+  const v = await DB.get('vistorias', id); if (!v) { pendingFollowUpFindingId = ''; return location.hash = '#/'; }
   const o = await DB.get('obras', v.obraId); const fotos = (await DB.by('fotos', 'vistoriaId', id)).sort(byTs);
   setTitle(v.local || 'Nova vistoria', '#/obra/' + o.id); setNav('obras');
   const TABS = [['dados', 'Dados'], ['fotos', `Fotos (${fotos.length})`], ['const', `Constatações (${(v.constatacoes || []).length})`], ['concl', 'Conclusão'], ['emitir', 'Emitir']];
@@ -435,6 +438,7 @@ async function vVistoria(view, id) {
     $('#nc').onclick = () => constSheet(v, fotos);
     tb.querySelectorAll('[data-c]').forEach(e => e.onclick = () => constSheet(v, fotos, v.constatacoes.find(c => c.id === e.dataset.c)));
     tb.querySelectorAll('[data-actions]').forEach(e => e.onclick = event => { event.stopPropagation(); const c=C.find(x=>x.id===e.dataset.actions); if(c) actionsSheet(v,c); });
+    if(pendingFollowUpFindingId){const target=[...tb.querySelectorAll('[data-c]')].find(el=>el.dataset.c===pendingFollowUpFindingId);pendingFollowUpFindingId='';if(target)target.click();else toast('A constatação não aparece na revisão atual da vistoria.');}
   }
   if (tab === 'concl') {
     tb.innerHTML = `<div class="card">${fld('Conclusão / parecer técnico', 'conclusao', v, { area: 1, rows: 6 })}${fld('Recomendações (uma por linha)', 'recomendacoes', v, { area: 1, rows: 6 })}</div>`;
@@ -621,6 +625,22 @@ async function compartilhar(blob, nome) {
 const filtro = { obra: '', status: '', q: '', de: '', ate: '', grupo: 'obra' };
 let analyticsWindowMonths = 12;
 async function sha(s) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+function followUpRow(item, labels) {
+  const title = esc(item.titulo), building = esc(item.edificio || "Edifício não identificado"), gravity = esc(item.gravidade), reason = esc(labels[item.motivo] || "Motivo indisponível"), deadline = item.prazo ? " · prazo declarado " + esc(item.prazo) : "";
+  return `<article class="follow-up-item"><div class="row sp"><b>${title}</b><span class="chip ${esc(gravCls(item.gravidade))}">${gravity}</span></div><div>${building}</div><div class="mut small">${reason}${deadline}</div><button class="btn sec sm" type="button" data-open-follow-up data-vistoria="${esc(item.vistoriaId)}" data-constatacao="${esc(item.constatacaoId)}" aria-label="Abrir constatação: ${title}">Abrir constatação</button></article>`;
+}
+function openFollowUpFinding(item, records, snapshots) {
+  const trigger = document.activeElement;
+  const record = records.find(row => row.vistoriaId === item.vistoriaId && row.snapshotId === item.snapshotId);
+  const snapshot = snapshots.find(row => row.id === item.snapshotId);
+  const finding = snapshot?.conteudo?.constatacoes?.find(row => row.id === item.constatacaoId);
+  if (!record || !finding) return toast('A constatação não está disponível no snapshot selecionado.');
+  const el = modal(`<h2 id="follow-up-dialog-title" tabindex="-1">${esc(finding.titulo || 'Sem título')}</h2><p class="mut small">Leitura do snapshot verificável, revisão ${esc(record.rev)}. Não altera o registro atual. O conteúdo é restrito ao aparelho; não o exiba em tela pública ou TV. O PIN é barreira de interface, não RBAC.</p><div class="follow-up-detail"><b>Gravidade</b><span>${esc(finding.gravidade || 'Sem classificação')}</span><b>Edifício</b><span>${esc(snapshot.conteudo.obra?.nome || 'Não identificado')}</span><b>Ambiente</b><span>${esc(finding.ambiente || 'Não informado')}</span><b>Local / elemento</b><span>${esc(finding.local || 'Não informado')}</span><b>Descrição</b><span>${esc(finding.descricao || 'Não informada')}</span><b>Recomendação</b><span>${esc(finding.recomendacao || 'Não informada')}</span></div><p class="mut small">Esta leitura usa o conteúdo congelado na emissão selecionada; pode diferir do rascunho ou da edição atual.</p><div class="row wrap"><button class="btn sec sm" id="follow-up-open-current">Abrir registro atual</button><button class="btn ghost sm" id="follow-up-close">Fechar</button></div>`, () => trigger?.focus());
+  el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-labelledby', 'follow-up-dialog-title');
+  el.querySelector('#follow-up-dialog-title').focus();
+  el.querySelector('#follow-up-close').onclick = closeModal;
+  el.querySelector('#follow-up-open-current').onclick = () => { tab = 'const'; pendingFollowUpFindingId = item.constatacaoId; location.hash = '#/vistoria/' + encodeURIComponent(item.vistoriaId); closeModal(); };
+}
 async function vPainel(view) {
   setTitle('Painel administrativo', ''); setNav('painel');
   if (S.pinHash && sessionStorage.getItem('cgu-adm') !== S.pinHash) {
@@ -646,8 +666,8 @@ async function vPainel(view) {
   const ids = new Set(F.map(v => v.id)); const E = ems.filter(e => ids.has(e.vistoriaId)).sort((a, b) => b.data - a.data);
   const vm = Object.fromEntries(vs.map(v => [v.id, v]));
   const nFotos = F.reduce((a, v) => a + (v.nFotos || 0), 0);
-  let actionSummary=null;
-  try{if(resumo&&typeof Analytics?.summarizeActions==='function')actionSummary=Analytics.summarizeActions(resumo.migrationRecords,snaps,acoes,{asOf:hoje()});}catch(error){console.error('Resumo de ações locais indisponível:',error);}
+  let actionSummary=null, followUpItems=[];
+  try{if(resumo&&typeof Analytics?.summarizeActions==='function'){const actionOptions={asOf:hoje(),now:Date.now()};actionSummary=Analytics.summarizeActions(resumo.migrationRecords,snaps,acoes,actionOptions);followUpItems=Analytics.listFollowUp(resumo.migrationRecords,snaps,acoes,actionOptions);}}catch(error){console.error('Resumo de ações locais indisponível:',error);}
   const grupos = {};
   F.forEach(v => { const k = filtro.grupo === 'obra' ? (om[v.obraId]?.nome || '—') : (v.local || 'Sem local'); (grupos[k] ||= []).push(v); });
   const integrityAlert = resumo ? (() => { const unverified=Number(resumo.counts.periodUnverifiedLatestEmissions)||0, stale=Number(resumo.stale.inspectionsEditedAfterEmission)||0; return unverified||stale ? `<div class="integrity-alert" role="note"><b>Conferência dos dados emitidos</b><p>${unverified} vistoria(s) da janela têm snapshot ausente, divergente ou ambíguo; ${stale} foram editadas depois da emissão selecionada.</p><p class="small">As dimensões usam apenas o snapshot verificável congelado na emissão. Rascunhos e alterações posteriores só entram após uma nova emissão.</p></div>` : '<div class="okbox integrity-clear" role="note">Nenhuma divergência de snapshot ou edição posterior identificada nesta janela.</div>'; })() : '';
@@ -671,7 +691,7 @@ async function vPainel(view) {
     </section>`;
   view.innerHTML = `
     <div class="kpis"><div class="kpi"><b>${new Set(F.map(v => v.obraId)).size}</b><span>EDIFÍCIOS</span></div><div class="kpi"><b>${F.length}</b><span>VISTORIAS</span></div><div class="kpi"><b>${F.filter(v => v.status === 'emitido').length}</b><span>EMITIDAS</span></div><div class="kpi"><b>${F.filter(v => v.status !== 'emitido').length}</b><span>EM RASCUNHO</span></div><div class="kpi"><b>${nFotos}</b><span>FOTOS</span></div><div class="kpi"><b>${E.length}</b><span>LINHAS DE EMISSÃO</span></div></div>
-    ${analyticsSection}${!actionSummary ? '<section class="card warnbox"><b>Indicadores de ações indisponíveis.</b> A lista de vistorias continua disponível.</section>' : `<section class="card"><h3>Ações declaradas ligadas às constatações selecionadas verificáveis no período (${esc(resumo.period.label)})</h3><div class="kpi"><span>DECLARADAS COMO CONCLUÍDAS / DECLARADAS (CANCELADAS EXCLUÍDAS)</span><b>${actionSummary.completed} / ${actionSummary.declared}</b><span>${actionSummary.overdue} vencidas · ${actionSummary.aging30} abertas há mais de 30 dias · ${actionSummary.cancelled} canceladas</span></div><p class="mut small">Declarações locais, não verificadas; uma ação continua vinculada à constatação pelo ID estável mesmo quando ela aparece em nova revisão. Ações de constatações fora do período ou não selecionadas ficam fora. Emissão não confirma execução nem encerra ação. Não é indicador institucional nem de risco.</p><div class="kpi"><span>CONSTATAÇÕES ALTAS/CRÍTICAS SEM AÇÃO DECLARADA / TOTAL ELEGÍVEL</span><b>${actionSummary.highCriticalWithoutAction} / ${actionSummary.highCriticalTotal}</b></div></section>`}<div class="card"><div class="grid2"><div><label style="margin-top:0">Edifício</label><select data-f="obra"><option value="">Todos</option>${obras.map(o => `<option value="${esc(o.id)}" ${filtro.obra === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></div>
+    ${analyticsSection}${!actionSummary ? '<section class="card warnbox"><b>Indicadores de ações indisponíveis.</b> A lista de vistorias continua disponível.</section>' : `<section class="card"><h3>Ações declaradas ligadas às constatações selecionadas verificáveis no período (${esc(resumo.period.label)})</h3><div class="kpi"><span>DECLARADAS COMO CONCLUÍDAS / DECLARADAS (CANCELADAS EXCLUÍDAS)</span><b>${actionSummary.completed} / ${actionSummary.declared}</b><span>${actionSummary.overdue} vencidas · ${actionSummary.aging30} abertas há mais de 30 dias · ${actionSummary.cancelled} canceladas</span></div><p class="mut small">Declarações locais, não verificadas; uma ação continua vinculada à constatação pelo ID estável mesmo quando ela aparece em nova revisão. Ações de constatações fora do período ou não selecionadas ficam fora. Emissão não confirma execução nem encerra ação. Não é indicador institucional nem de risco.</p><div class="kpi"><span>CONSTATAÇÕES ALTAS/CRÍTICAS SEM AÇÃO DECLARADA / TOTAL ELEGÍVEL</span><b>${actionSummary.highCriticalWithoutAction} / ${actionSummary.highCriticalTotal}</b></div><details class="follow-up card"><summary>Itens para acompanhamento (${followUpItems.length})</summary><p class="mut small">Lista local somente de snapshots verificados no período. Uma constatação pode aparecer em mais de um motivo; ações e vínculos continuam sendo declarações não verificadas. Ausência de vínculo de recorrência não significa que ele não foi avaliado.</p><label for="follow-up-reason">Filtrar motivo</label><select id="follow-up-reason"><option value="">Todos os motivos</option><option value="vencida">Ação vencida (${actionSummary.overdue})</option><option value="aberta_30d">Aberta há mais de 30 dias (${actionSummary.aging30})</option><option value="sem_acao">Alta/Crítica sem ação declarada (${actionSummary.highCriticalWithoutAction})</option></select><p id="follow-up-page-info" class="mut small" tabindex="-1" aria-live="polite"></p><div id="follow-up-list"></div><div class="row wrap"><button class="btn sec sm" id="follow-up-prev" aria-label="Página anterior da fila">Anterior</button><button class="btn sec sm" id="follow-up-next" aria-label="Próxima página da fila">Próximos</button></div></details></section>`}<div class="card"><div class="grid2"><div><label style="margin-top:0">Edifício</label><select data-f="obra"><option value="">Todos</option>${obras.map(o => `<option value="${esc(o.id)}" ${filtro.obra === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></div>
       <div><label style="margin-top:0">Situação</label><select data-f="status"><option value="">Todas</option><option value="rascunho" ${filtro.status === 'rascunho' ? 'selected' : ''}>Rascunho</option><option value="emitido" ${filtro.status === 'emitido' ? 'selected' : ''}>Emitido</option></select></div>
       <div><label>De</label><input type="date" data-f="de" value="${esc(filtro.de)}"></div><div><label>Até</label><input type="date" data-f="ate" value="${esc(filtro.ate)}"></div></div>
       <label>Buscar local ou edifício</label><input data-f="q" type="search" value="${esc(filtro.q)}"></div>
@@ -680,6 +700,25 @@ async function vPainel(view) {
     <div class="row sp"><h2>Registro de emissões</h2><button class="btn sec sm" id="csv">Exportar CSV</button></div>
     <div class="tw"><table><tr><th>Data/hora</th><th>Documento</th><th>Rev.</th><th>Tipo</th><th>Fmt</th><th>Edifício · Local</th><th>Emitido por</th></tr>${E.slice(0, 80).map(e => `<tr><td>${esc(Rep.fTs(e.data))}</td><td>${esc(e.numero)}</td><td>${esc(pad(e.rev))}</td><td>${esc(tipoNome(e.tipo, true))}</td><td>${esc(String(e.formato||'').toUpperCase())}</td><td>${esc((om[e.obraId]?.nome || '') + ' · ' + (vm[e.vistoriaId]?.local || ''))}</td><td>${esc(e.usuario || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="mut">Sem emissões.</td></tr>'}</table></div>`;
   bindGo(view);
+  const followUpFilter=view.querySelector('#follow-up-reason');
+  if (followUpFilter) {
+    let page = 0;
+    const pageSize = 50, list = view.querySelector("#follow-up-list"), info = view.querySelector("#follow-up-page-info"), previous = view.querySelector("#follow-up-prev"), next = view.querySelector("#follow-up-next");
+    const labels = { vencida: 'Ação declarada vencida', aberta_30d: 'Ação declarada aberta há mais de 30 dias', sem_acao: 'Alta/Crítica sem ação declarada' };
+    const renderPage = focusControl => {
+      const result = Analytics.pageFollowUp(followUpItems, followUpFilter.value, page, pageSize);
+      page = result.page;
+      info.textContent = result.total ? "Exibindo " + (page * pageSize + 1) + "–" + (page * pageSize + result.items.length) + " de " + result.total + "; motivo " + (followUpFilter.value ? labels[followUpFilter.value] : "todos") + "." : "Nenhum item para acompanhamento neste motivo.";
+      list.innerHTML = result.items.map(item => followUpRow(item, labels)).join("");
+      previous.disabled = page === 0; next.disabled = page >= result.pages - 1;
+      list.querySelectorAll("[data-open-follow-up]").forEach(button => button.onclick = () => { const item = followUpItems.find(row => row.vistoriaId === button.dataset.vistoria && row.constatacaoId === button.dataset.constatacao); if (item) openFollowUpFinding(item, resumo.migrationRecords, snaps); });
+      if (focusControl?.disabled) info.focus();
+    };
+    followUpFilter.onchange = () => { page = 0; renderPage(); };
+    previous.onclick = () => { if (page > 0) { page--; renderPage(previous); } };
+    next.onclick = () => { if (page < Analytics.pageFollowUp(followUpItems, followUpFilter.value, page, pageSize).pages - 1) { page++; renderPage(next); } };
+    renderPage();
+  }
   const periodSelect = view.querySelector('#analytics-window');
   if (periodSelect) periodSelect.onchange = () => { analyticsWindowMonths = periodSelect.value === 'all' ? null : Number(periodSelect.value); route(); };
   const downloadAnalytics = async manifest => {

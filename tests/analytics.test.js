@@ -2,9 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
+const vm = require('node:vm');
 const Analytics = require('../analytics.js');
 const SnapshotLib = require('../emission-snapshot.js');
 const Taxonomia = require('../taxonomia.js');
+const Backup = require('../backup.js');
 const uid = () => crypto.randomUUID();
 
 async function report({ obraId, vistoriaId, seq, rev, date, timestamp, findings = [], withGps = false, withPhoto = false }) {
@@ -12,8 +14,8 @@ async function report({ obraId, vistoriaId, seq, rev, date, timestamp, findings 
   const photo = withPhoto ? { id: uid(), vistoriaId, blob: new Blob([new Uint8Array([255, 216, 255, 1])], { type: 'image/jpeg' }), ts: timestamp, lat: null, lon: null, descricao: 'SENSITIVE PHOTO NOTE', origem: 'camera', w: 2, h: 2, marks: [], notas: [] } : null;
   const vistoria = { id: vistoriaId, obraId, local: 'SENSITIVE LOCATION', tipo: 'Vistoria técnica de rotina', data: date, hora: '09:00', status: 'emitido', nFotos: photo ? 1 : 0, seq, ano: 2026, updatedAt: timestamp, gps: withGps ? { lat: -15.8, lon: -47.9, acc: 5 } : null, constatacoes: findings.map((f, i) => ({ id: f.id || uid(), ...(f.recorrenciaDeId ? { recorrenciaDeId: f.recorrenciaDeId } : {}), titulo: 'SENSITIVE FINDING', tipo: f.tipo, gravidade: f.gravidade, ambiente: f.ambiente, local: 'private', descricao: 'private', recomendacao: 'private', fotoIds: photo && i === 0 ? [photo.id] : [] })) };
   const emissaoId = uid();
-  const conteudo = await SnapshotLib.capturar({ obra, vistoria, fotos: photo ? [photo] : [], cfg: { empresa: { nome: 'private' }, rt: { nome: 'private' }, usuario: 'private' }, emissao: { tipo: 'tecnico', numero: { seq, ano: 2026 }, rev }, appVersion: '1.5.0' });
-  const snapshot = await SnapshotLib.criar({ id: uid(), emissaoId, formato: 'pdf', conteudo, appVersion: '1.5.0', criadoEm: timestamp });
+  const conteudo = await SnapshotLib.capturar({ obra, vistoria, fotos: photo ? [photo] : [], cfg: { empresa: { nome: 'private' }, rt: { nome: 'private' }, usuario: 'private' }, emissao: { tipo: 'tecnico', numero: { seq, ano: 2026 }, rev }, appVersion: '1.6.0' });
+  const snapshot = await SnapshotLib.criar({ id: uid(), emissaoId, formato: 'pdf', conteudo, appVersion: '1.6.0', criadoEm: timestamp });
   const emission = { id: emissaoId, vistoriaId, obraId, tipo: 'tecnico', formato: 'pdf', numero: `VT-${String(seq).padStart(3, '0')}/2026`, rev, data: timestamp, arquivo: `VT-${String(seq).padStart(3, '0')}-2026_Rev${String(rev).padStart(2, '0')}.pdf`, snapshotId: snapshot.id, snapshotHash: snapshot.hash };
   return { obra, vistoria, snapshot, emission };
 }
@@ -217,4 +219,99 @@ test('declaração local continua associada pelo ID estável em nova revisão',(
   const action={vistoriaId,constatacaoId:findingId,snapshotId:oldSnapshot.id,estado:'concluida',concluidaEm:1,criadoEm:1,prazo:'2026-10-29'};
   const summary=Analytics.summarizeActions([{vistoriaId,snapshotId:currentSnapshot.id}],[oldSnapshot,currentSnapshot],[action],{asOf:'2026-10-30',now:40*86400000});
   assert.deepEqual(summary,{completed:1,declared:1,active:0,cancelled:0,overdue:0,aging30:0,highCriticalWithoutAction:0,highCriticalTotal:1});
+});
+
+test('fila local reconcilia motivos com os KPIs e exclui ações concluídas/canceladas',()=>{
+  const vistoriaId=uid(),snapshotId=uid(),ids=[uid(),uid(),uid(),uid()];
+  const snapshot={id:snapshotId,conteudo:{obra:{nome:'Edifício local'},constatacoes:[
+    {id:ids[0],titulo:'Sem ação',gravidade:'Alta',descricao:'não exportar',local:'privado'},
+    {id:ids[1],titulo:'Vencida e antiga',gravidade:'Crítica'},
+    {id:ids[2],titulo:'Concluída',gravidade:'Média'},
+    {id:ids[3],titulo:'Cancelada',gravidade:'Alta'}
+  ]}};
+  const records=[{vistoriaId,snapshotId}],now=100*86400000;
+  const actions=[
+    {id:uid(),vistoriaId,constatacaoId:ids[1],estado:'aberta',prazo:'2026-10-01',criadoEm:now-40*86400000,observacao:'segredo'},
+    {id:uid(),vistoriaId,constatacaoId:ids[1],estado:'em-execucao',prazo:'2026-11-01',criadoEm:now-35*86400000},
+    {id:uid(),vistoriaId,constatacaoId:ids[2],estado:'concluida',prazo:'2026-10-01',criadoEm:now-40*86400000},
+    {id:uid(),vistoriaId,constatacaoId:ids[3],estado:'cancelada',prazo:'2026-10-01',criadoEm:now-40*86400000}
+  ];
+  const summary=Analytics.summarizeActions(records,[snapshot],actions,{asOf:'2026-10-30',now});
+  const list=Analytics.listFollowUp(records,[snapshot],actions,{asOf:'2026-10-30',now});
+  const count=reason=>list.filter(x=>x.motivo===reason).length;
+  assert.equal(count('vencida'),summary.overdue);
+  assert.equal(count('aberta_30d'),summary.aging30);
+  assert.equal(count('sem_acao'),summary.highCriticalWithoutAction);
+  assert.deepEqual(summary,{completed:1,declared:3,active:2,cancelled:1,overdue:1,aging30:2,highCriticalWithoutAction:2,highCriticalTotal:3});
+  assert.equal(list.some(x=>x.constatacaoId===ids[2]&&x.motivo!=='sem_acao'),false);
+  assert.equal(list.some(x=>x.constatacaoId===ids[3]&&x.motivo!=='sem_acao'),false);
+  assert.ok(list.every(x=>!Object.hasOwn(x,'observacao')&&!Object.hasOwn(x,'descricao')&&!Object.hasOwn(x,'gps')));
+  assert.ok(list.every(x=>Object.keys(x).sort().join(',')==='actionId,constatacaoId,edificio,gravidade,motivo,prazo,snapshotId,titulo,vistoriaId'));
+});
+
+test('fila local é determinística, respeita apenas snapshots selecionados e não infere decisão de recorrência',()=>{
+  const v1=uid(),v2=uid(),s1=uid(),s2=uid(),c1=uid(),c2=uid();
+  const snapshots=[
+    {id:s1,conteudo:{obra:{nome:'A'},constatacoes:[{id:c1,titulo:'<img onerror=x>',gravidade:'Alta'}]}},
+    {id:s2,conteudo:{obra:{nome:'B'},constatacoes:[{id:c2,titulo:'B',gravidade:'Crítica'}]}},
+    {id:uid(),conteudo:{obra:{nome:'Fora'},constatacoes:[{id:uid(),gravidade:'Crítica'}]}}
+  ];
+  const records=[{vistoriaId:v1,snapshotId:s1},{vistoriaId:v2,snapshotId:s2}],actions=[];
+  const a=Analytics.listFollowUp(records,snapshots,actions,{asOf:'2026-10-30'});
+  const b=Analytics.listFollowUp([...records].reverse(),[...snapshots].reverse(),actions,{asOf:'2026-10-30'});
+  assert.deepEqual(a,b);assert.equal(a.length,2);assert.equal(a[0].gravidade,'Crítica');
+  assert.ok(a.every(x=>x.motivo==='sem_acao'));
+  assert.ok(a.every(x=>!('descricao' in x)&&!('fotoIds' in x)&&!('recorrenciaDeId' in x)));
+  assert.equal(a.find(x=>x.constatacaoId===c1).titulo,'<img onerror=x>');
+});
+
+test('fila vazia e dados legados incompletos não quebram, e UI escapa rótulos e só navega',()=>{
+  assert.deepEqual(Analytics.listFollowUp(),[]);
+  const snapshot={id:'legacy-snapshot',conteudo:{obra:{},constatacoes:[{id:'legacy-finding',gravidade:'Alta',titulo:'<svg onload=alert(1)>'}]}};
+  const rows=Analytics.listFollowUp([{vistoriaId:'legacy-vistoria',snapshotId:'legacy-snapshot'}],[snapshot],[],{asOf:'2026-10-30'});
+  assert.equal(rows.length,1);assert.equal(rows[0].edificio,'');assert.equal(rows[0].prazo,'');
+  const app=fs.readFileSync(require.resolve('../app.js'),'utf8');
+  assert.match(app,/Analytics\.listFollowUp\(resumo\.migrationRecords/);
+  assert.match(app,/esc\(item\.titulo\)/);assert.match(app,/data-open-follow-up/);
+  assert.match(app,/pendingFollowUpFindingId/);assert.match(app,/data-open-follow-up/);
+  assert.match(app,/aria-label="Abrir constatação: /);assert.match(app,/aria-live="polite"/);
+  assert.match(app,/if \(!v\) \{ pendingFollowUpFindingId = ''/);assert.match(app,/decodeRouteSegment\(h\[1\]\)/);
+  assert.match(app,/if \(focusControl\?\.disabled\) info\.focus\(\)/);assert.match(app,/const actionOptions=\{asOf:hoje\(\),now:Date\.now\(\)\}/);
+  assert.match(app,/Ausência de vínculo de recorrência não significa que ele não foi avaliado/);
+  assert.doesNotMatch(app,/DB\.put\(['"]acoes['"]/);
+  const helper=app.match(/function decodeRouteSegment\(segment\) \{[^\n]+\}/);
+  assert.ok(helper);const context=vm.createContext({});vm.runInContext(helper[0],context);
+  assert.equal(vm.runInContext('decodeRouteSegment("%E0%A4%A")',context),null);
+  assert.equal(vm.runInContext('decodeRouteSegment("legacy-123")',context),'legacy-123');
+  const reader=app.match(/function openFollowUpFinding\(item, records, snapshots\) \{[\s\S]*?\n\}/);
+  assert.ok(reader);for(const field of ['titulo','gravidade','nome','ambiente','local','descricao','recomendacao'])assert.match(reader[0],new RegExp('esc\\([^\\n]*'+field));
+  assert.doesNotMatch(reader[0],/DB\.put|DB\.putAcao/);assert.match(reader[0],/follow-up-open-current/);
+  let html='',toastMessage='',closed=0,modalCount=0,modalOnClose=null,headingFocused=0,restoredFocus=0;const buttons={},trigger={focus:()=>restoredFocus++},dialogAttrs={};
+  const modalRoot={setAttribute:(name,value)=>dialogAttrs[name]=value,querySelector:selector=>selector==='#follow-up-dialog-title'?{focus:()=>headingFocused++}:buttons[selector]||(buttons[selector]={})};
+  const modalContext=vm.createContext({document:{activeElement:trigger},esc:Backup.escapeHtml,gravCls:()=> 'mut',toast:message=>{toastMessage=message;},modal:(markup,onclose)=>{html=markup;modalCount++;modalOnClose=onclose;return modalRoot;},closeModal:()=>{closed++;modalOnClose?.();},location:{hash:''},tab:'painel',pendingFollowUpFindingId:''});
+  vm.runInContext(reader[0],modalContext);
+  const vistoriaId='legacy /vistoria?',snapshotId='legacy-snapshot',constatacaoId='legacy-finding';
+  const modalSnapshot={id:snapshotId,conteudo:{obra:{nome:'<b>Edifício</b>'},constatacoes:[{id:constatacaoId,titulo:'<svg onload=x>',gravidade:'Alta',ambiente:'<img>',local:'<script>',descricao:'<iframe>',recomendacao:'<object>'}]}};
+  modalContext.openFollowUpFinding({vistoriaId,snapshotId,constatacaoId},[{vistoriaId,snapshotId,rev:2}],[modalSnapshot]);
+  assert.ok(html.includes('&lt;svg onload=x&gt;'));assert.ok(html.includes('&lt;iframe&gt;'));assert.doesNotMatch(html,/<svg onload=x>|<iframe>/);
+  assert.equal(dialogAttrs.role,'dialog');assert.equal(dialogAttrs['aria-modal'],'true');assert.equal(headingFocused,1);
+  buttons['#follow-up-open-current'].onclick();
+  assert.equal(modalContext.tab,'const');assert.equal(modalContext.pendingFollowUpFindingId,constatacaoId);assert.equal(modalContext.location.hash,'#/vistoria/legacy%20%2Fvistoria%3F');assert.equal(closed,1);assert.equal(restoredFocus,1);
+  modalContext.openFollowUpFinding({vistoriaId,snapshotId,constatacaoId},[],[]);
+  assert.equal(modalCount,1);assert.ok(toastMessage.includes('snapshot selecionado'));
+});
+
+test('paginador aplica filtro e limites sem perder nem duplicar linhas',()=>{
+  const rows=Array.from({length:5},(_,i)=>({id:i,motivo:i===4?'sem_acao':'vencida'}));
+  assert.deepEqual(Analytics.pageFollowUp(rows,'vencida',1,2),{items:[{id:2,motivo:'vencida'},{id:3,motivo:'vencida'}],total:4,page:1,pageSize:2,pages:2});
+  assert.deepEqual(Analytics.pageFollowUp(rows,'sem_acao',99,2),{items:[rows[4]],total:1,page:0,pageSize:2,pages:1});
+  assert.deepEqual(Analytics.pageFollowUp(rows,'vencida',-1,0),{items:rows.slice(0,4),total:4,page:0,pageSize:50,pages:1});
+  assert.deepEqual(Analytics.pageFollowUp([],''),{items:[],total:0,page:0,pageSize:50,pages:1});
+});
+
+test('migrationRecords duplicados não repetem linhas e seleções ambíguas ficam fora',()=>{
+  const vistoriaId=uid(),s1=uid(),s2=uid(),findingId=uid();
+  const snapshots=[{id:s1,conteudo:{obra:{nome:'A'},constatacoes:[{id:findingId,gravidade:'Alta'}]}},{id:s2,conteudo:{obra:{nome:'B'},constatacoes:[{id:findingId,gravidade:'Crítica'}]}}];
+  assert.equal(Analytics.listFollowUp([{vistoriaId,snapshotId:s1},{vistoriaId,snapshotId:s1}],snapshots).length,1);
+  assert.deepEqual(Analytics.listFollowUp([{vistoriaId,snapshotId:s1},{vistoriaId,snapshotId:s2}],snapshots),[]);
 });
