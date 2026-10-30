@@ -27,6 +27,15 @@ test('KPI sem denominador não é marcado como calculável',async()=>{
   assert.equal(result.object.kpis.coverage.denominator,0);
 });
 
+test('agregado exporta apenas contagens do vínculo de recorrência, nunca o ID de destino',async()=>{
+  const input=sample(),target='44444444-4444-4444-8444-444444444444';
+  input.kpis.recurrence={numerator:1,denominator:2,meaning:'private'};
+  input.secret=target;
+  const result=await Export.gerarAgregado(input,{SnapshotLib});
+  assert.deepEqual(result.object.kpis.recurrence,{numerator:1,denominator:2,calculable:true});
+  assert.equal(result.json.includes(target),false);
+});
+
 test('manifesto omite IDs por padrão e só os inclui por opção explícita',async()=>{
   const noIds=await Export.gerarManifesto(sample(),{SnapshotLib});
   assert.equal(noIds.object.idsIncluded,false);assert.equal('vistoriaId' in noIds.object.records[0],false);await verify(noIds);

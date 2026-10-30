@@ -29,7 +29,7 @@ Somente em emissão **oficial** (rascunhos não geram registro nem snapshot). A 
 - `emissao`: `{tipo, numero:{seq,ano}, rev}` — `numero` é **local ao aparelho** (backend central ainda não existe)
 - `obra`: registro de edifício sem alteração
 - `vistoria`: campos da vistoria **exceto** `constatacoes` e `status` (status muda por causa da própria emissão). `updatedAt` e `nFotos` ficam.
-- `constatacoes[]`: cópia integral, na ordem do relatório
+- `constatacoes[]`: cópia integral, na ordem do relatório. Campo opcional `recorrenciaDeId` (UUID de outra constatação) é uma declaração explícita, não inferência automática. O editor oferece destinos de snapshots verificados anteriores do mesmo edifício, mas backup/importação não prova que o destino exista, seja anterior ou pertença ao mesmo edifício; referências ausentes são permitidas. A validação recusa ID inválido e autorreferência. O valor só aparece nos snapshots emitidos depois de declarado; os históricos permanecem imutáveis.
 - `evidencias[]`: uma por foto, na ordem do relatório (`ts`): todos os metadados serializáveis (`id, ts, lat, lon, acc, descricao, origem, w, h, marks, notas, stampLines…`) + `sha256` e `bytes` do `blob` emitido, `baseSha256`/`baseBytes` se houver original, `temCropBackup`. **Nunca** inclui bytes de imagem, `blob`, `base`, `cropBackup`.
 - `configuracao`: `empresa`, `rt`, `usuario` (campos impressos no relatório). Nunca `pinHash`.
 

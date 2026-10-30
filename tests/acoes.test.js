@@ -61,7 +61,7 @@ test('putAcao concorrente com exclusão da vistoria não deixa ação órfã',{s
 });
 
 test('backup valida ações por campos, estado, rowVersion e vínculo com constatação do snapshot',async()=>{
-  const obra={id:U(),nome:'Edifício'},constatacao={id:U(),titulo:'Fissura',tipo:'Fissura / trinca em elemento estrutural',gravidade:'Alta',ambiente:'Fachada',local:'',descricao:'',recomendacao:'',fotoIds:[]};
+  const obra={id:U(),nome:'Edifício'},constatacao={id:U(),recorrenciaDeId:U(),titulo:'Fissura',tipo:'Fissura / trinca em elemento estrutural',gravidade:'Alta',ambiente:'Fachada',local:'',descricao:'',recomendacao:'',fotoIds:[]};
   const vistoria={id:U(),obraId:obra.id,local:'Fachada',tipo:'Vistoria técnica de rotina',data:'2026-08-01',hora:'10:00',status:'emitido',nFotos:0,seq:1,ano:2026,updatedAt:10,constatacoes:[constatacao]};
   const emissaoId=U(),snapshotId=U(),conteudo=await SnapshotLib.capturar({obra,vistoria,fotos:[],cfg:{empresa:{nome:'Unidade'},rt:{nome:'RT'},usuario:'Técnico'},emissao:{tipo:'tecnico',numero:{seq:1,ano:2026},rev:0},appVersion:'1.3.0'});
   const snapshot=await SnapshotLib.criar({id:snapshotId,emissaoId,formato:'pdf',conteudo,appVersion:'1.3.0'});
@@ -69,6 +69,9 @@ test('backup valida ações por campos, estado, rowVersion e vínculo com consta
   const action={id:U(),constatacaoId:constatacao.id,vistoriaId:vistoria.id,snapshotId,responsavelFuncao:'Manutenção',prazo:'2026-12-15',estado:'aberta',concluidaEm:null,observacao:'Acompanhar',criadoEm:1,atualizadoEm:1,rowVersion:1};
   const base={app:'cgu-vistorias',v:1,appVersion:'1.3.0',exportadoEm:1,seqs:{},obras:[obra],vistorias:[vistoria],emissoes:[emission],fotos:[],snapshots:[snapshot],acoes:[action]};
   assert.equal((await Backup.validate(base,JSON.stringify(base).length,SnapshotLib)).data.acoes.length,1);
+  const unknownTarget=constatacao.recorrenciaDeId;assert.equal(snapshot.conteudo.constatacoes[0].recorrenciaDeId,unknownTarget);
+  const selfLink=structuredClone(base);selfLink.vistorias[0].constatacoes[0].recorrenciaDeId=selfLink.vistorias[0].constatacoes[0].id;await assert.rejects(()=>Backup.validate(selfLink,JSON.stringify(selfLink).length,SnapshotLib),/autorreferente|hash não confere/);
+  const malformedLink=structuredClone(base);malformedLink.vistorias[0].constatacoes[0].recorrenciaDeId='not-a-uuid';await assert.rejects(()=>Backup.validate(malformedLink,JSON.stringify(malformedLink).length,SnapshotLib),/recorrenciaDeId/);
   const orphanEmission={...emission,id:U(),vistoriaId:U()};
   await assert.rejects(()=>Backup.validate({...base,emissoes:[emission,orphanEmission]},JSON.stringify({...base,emissoes:[emission,orphanEmission]}).length,SnapshotLib),/Emissão órfã\/inconsistente/);
   const keptEmissions=Backup.selectEmissionsForVistorias([emission,orphanEmission],new Set([vistoria.id]));assert.deepEqual(keptEmissions,[emission]);
@@ -98,6 +101,11 @@ test('interface deixa claro que ação é declarada, não altera snapshot, e bac
   assert.match(dbSource,/rejeitado_vinculo/);
   assert.match(dbSource,/if\(!emissionSnapshotIds\.has\(action\.snapshotId\)\)rejectActionLink/);
   assert.match(app,/resumo\.period\.label/);
+  assert.match(app,/recurrenceChoices\(v,c\)/);
+  assert.match(app,/Vínculo explícito com constatação anterior/);
+  assert.match(app,/não deduz recorrência pelo texto/);
+  assert.match(app,/content\.obra\?\.id!==v\.obraId/);
+  assert.match(app,/VÍNCULOS EXPLÍCITOS DE RECORRÊNCIA DECLARADOS/);
   assert.match(app,/Backup\.selectEmissionsForVistorias/);
   assert.match(app,/ficarão fora deste backup/);
   const snapshotSource=fs.readFileSync(path.join(__dirname,'..','emission-snapshot.js'),'utf8');

@@ -9,10 +9,10 @@ const uid = () => crypto.randomUUID();
 async function report({ obraId, vistoriaId, seq, rev, date, timestamp, findings = [], withGps = false, withPhoto = false }) {
   const obra = { id: obraId, nome: 'SENSITIVE BUILDING NAME', cliente: 'private', endereco: 'private', contrato: '', art: '', criadoEm: 1 };
   const photo = withPhoto ? { id: uid(), vistoriaId, blob: new Blob([new Uint8Array([255, 216, 255, 1])], { type: 'image/jpeg' }), ts: timestamp, lat: null, lon: null, descricao: 'SENSITIVE PHOTO NOTE', origem: 'camera', w: 2, h: 2, marks: [], notas: [] } : null;
-  const vistoria = { id: vistoriaId, obraId, local: 'SENSITIVE LOCATION', tipo: 'Vistoria técnica de rotina', data: date, hora: '09:00', status: 'emitido', nFotos: photo ? 1 : 0, seq, ano: 2026, updatedAt: timestamp, gps: withGps ? { lat: -15.8, lon: -47.9, acc: 5 } : null, constatacoes: findings.map((f, i) => ({ id: uid(), titulo: 'SENSITIVE FINDING', tipo: f.tipo, gravidade: f.gravidade, ambiente: f.ambiente, local: 'private', descricao: 'private', recomendacao: 'private', fotoIds: photo && i === 0 ? [photo.id] : [] })) };
+  const vistoria = { id: vistoriaId, obraId, local: 'SENSITIVE LOCATION', tipo: 'Vistoria técnica de rotina', data: date, hora: '09:00', status: 'emitido', nFotos: photo ? 1 : 0, seq, ano: 2026, updatedAt: timestamp, gps: withGps ? { lat: -15.8, lon: -47.9, acc: 5 } : null, constatacoes: findings.map((f, i) => ({ id: f.id || uid(), ...(f.recorrenciaDeId ? { recorrenciaDeId: f.recorrenciaDeId } : {}), titulo: 'SENSITIVE FINDING', tipo: f.tipo, gravidade: f.gravidade, ambiente: f.ambiente, local: 'private', descricao: 'private', recomendacao: 'private', fotoIds: photo && i === 0 ? [photo.id] : [] })) };
   const emissaoId = uid();
-  const conteudo = await SnapshotLib.capturar({ obra, vistoria, fotos: photo ? [photo] : [], cfg: { empresa: { nome: 'private' }, rt: { nome: 'private' }, usuario: 'private' }, emissao: { tipo: 'tecnico', numero: { seq, ano: 2026 }, rev }, appVersion: '1.1.0' });
-  const snapshot = await SnapshotLib.criar({ id: uid(), emissaoId, formato: 'pdf', conteudo, appVersion: '1.1.0', criadoEm: timestamp });
+  const conteudo = await SnapshotLib.capturar({ obra, vistoria, fotos: photo ? [photo] : [], cfg: { empresa: { nome: 'private' }, rt: { nome: 'private' }, usuario: 'private' }, emissao: { tipo: 'tecnico', numero: { seq, ano: 2026 }, rev }, appVersion: '1.4.0' });
+  const snapshot = await SnapshotLib.criar({ id: uid(), emissaoId, formato: 'pdf', conteudo, appVersion: '1.4.0', criadoEm: timestamp });
   const emission = { id: emissaoId, vistoriaId, obraId, tipo: 'tecnico', formato: 'pdf', numero: `VT-${String(seq).padStart(3, '0')}/2026`, rev, data: timestamp, arquivo: `VT-${String(seq).padStart(3, '0')}-2026_Rev${String(rev).padStart(2, '0')}.pdf`, snapshotId: snapshot.id, snapshotHash: snapshot.hash };
   return { obra, vistoria, snapshot, emission };
 }
@@ -50,7 +50,7 @@ test('agrega somente o último snapshot verificável de cada vistoria e não mul
   for (const unsafe of ['constructor', '__proto__', '<img onerror=alert(1)>']) assert.equal(JSON.stringify(result.dimensions).includes(unsafe), false);
   assert.equal(result.dimensions.month.find(x => x.label === 'Data ausente').count, 1);
   assert.equal(result.stale.inspectionsEditedAfterEmission, 1);
-  assert.equal(result.kpis.recurrence.calculable, false);
+  assert.deepEqual([result.kpis.recurrence.numerator,result.kpis.recurrence.denominator,result.kpis.recurrence.calculable],[0,5,true]);
   assert.equal(result.kpis.remediation.calculable, false);
   assert.equal(result.risk.calculable, false);
   const serialized = JSON.stringify(result);
@@ -78,6 +78,17 @@ test('densidade acima de 100% é exibida como razão, sem símbolo de percentual
   const rendered = Analytics.formatDensity({ numerator: 5, denominator: 2 });
   assert.equal(rendered, '2,5 constatações por vistoria (5 / 2)');
   assert.equal(rendered.includes('%'), false);
+});
+
+test('recorrência conta só vínculos explícitos válidos, sem inferir pelo conteúdo', async () => {
+  const obraId=uid(), target=uid();
+  const r=await report({obraId,vistoriaId:uid(),seq:61,rev:0,date:'2026-10-01',timestamp:610,findings:[
+    {id:uid(),gravidade:'Alta',tipo:'Fissura',ambiente:'Fachada'},
+    {id:uid(),recorrenciaDeId:target,gravidade:'Alta',tipo:'Fissura',ambiente:'Fachada'}
+  ]});
+  const result=await Analytics.resumir({obras:[r.obra],vistorias:[r.vistoria],emissoes:[r.emission],snapshots:[r.snapshot],snapshotLib:SnapshotLib});
+  assert.deepEqual([result.kpis.recurrence.numerator,result.kpis.recurrence.denominator,result.kpis.recurrence.calculable],[1,2,true]);
+  assert.equal(JSON.stringify(result.kpis.recurrence).includes(target),false);
 });
 
 test('empate de revisão/data exige todos os snapshots válidos e conteúdo analítico idêntico', async () => {

@@ -175,6 +175,7 @@
     const unknownSeverity = findings.filter(c => !GRAVIDADES.includes(c?.gravidade)).length;
     if (unknownSeverity) severity.push({ label: 'Sem classificação', count: unknownSeverity });
 
+    const recurrenceLinks = findings.filter(c => typeof c?.id === 'string' && typeof c?.recorrenciaDeId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(c.recorrenciaDeId) && c.recorrenciaDeId !== c.id).length;
     return {
       schema: 'cgu-local-analytics-v1',
       period,
@@ -185,7 +186,7 @@
       kpis: {
         coverage: { numerator: inspectedBuildings.size, denominator: obraIds.size, meaning: `Edifícios locais com snapshot verificável na janela (${period.label}) / edifícios cadastrados neste aparelho.` },
         severeDensity: { numerator: severe, denominator: scopedVerified.length, meaning: `Constatações Alta ou Crítica / vistorias com último snapshot verificável na janela (${period.label}).` },
-        recurrence: { calculable: false, reason: 'Não há vínculo estruturado e validado entre constatações reincidentes.' },
+        recurrence: { numerator: recurrenceLinks, denominator: findings.length, calculable: findings.length > 0, meaning: 'Constatações com vínculo de recorrência declarado / constatações dos snapshots verificáveis; relação declarada, não verificada.' },
         remediation: { calculable: false, reason: 'Saneamento verificado não é calculado; ações locais são declarações do usuário sem comprovação de execução.' },
         formalization: { numerator: inspectionsWithEmission.size, denominator: scopedInspections.length, meaning: `Vistorias locais com emissão / vistorias na janela (${period.label}).` },
       snapshotIntegrity: { numerator: inspectionsWithVerified.size, denominator: inspectionsWithEmission.size, meaning: `Vistorias com snapshot selecionado verificável / vistorias com emissão na janela (${period.label}).` },

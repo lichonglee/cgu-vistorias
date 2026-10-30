@@ -201,6 +201,18 @@ test('consistência do envelope: numero, appVersion, evidências e refs são con
     ['obraId da vistoria', mut(x => { x.conteudo.vistoria.obraId = U(); })]
   ]) { const r = await S.validar(await recalc(x)); assert.equal(r.ok, false, nome); }
 });
+
+test('snapshot preserva vínculo explícito e rejeita ID inválido ou autorreferência', async () => {
+  const c=cenario(), target=U();
+  c.vistoria.constatacoes[0].recorrenciaDeId=target;
+  const {snap}=await emitido(c);
+  assert.equal((await S.validar(snap)).ok,true);
+  assert.equal(snap.conteudo.constatacoes[0].recorrenciaDeId,target);
+  for(const bad of ['not-a-uuid',snap.conteudo.constatacoes[0].id]){
+    const altered=clonar(snap);altered.conteudo.constatacoes[0].recorrenciaDeId=bad;altered.hash=await S.hashSnapshot(altered);
+    assert.equal((await S.validar(altered)).ok,false,bad);
+  }
+});
 test('ids legados (não UUID) de vistoria/edifício são aceitos; id do snapshot/emissão continua UUID', async () => {
   const c = cenario(); c.obra.id = 'lx3k9a2b1f'; c.vistoria.id = 'lx3k9a2b5q'; c.vistoria.obraId = c.obra.id; c.fotos[0].vistoriaId = c.vistoria.id;
   const { snap } = await emitido(c);

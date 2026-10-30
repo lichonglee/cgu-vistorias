@@ -442,22 +442,58 @@ async function vVistoria(view, id) {
   }
   if (tab === 'emitir') await vEmitir(tb, v, o, fotos);
 }
-function constSheet(v, fotos, c) {
+async function recurrenceChoices(v, c) {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const validDate=value=>{if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;const d=new Date(`${value}T00:00:00Z`);return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===value;};
+  const currentDate = validDate(v.data) ? v.data : '';
+  if (!currentDate) return { rows: [], truncated: false };
+  const [emissions, snapshots, inspections, works] = await Promise.all([DB.all('emissoes'), DB.all('snapshots'), DB.all('vistorias'), DB.all('obras')]);
+  const snapshotById = new Map(snapshots.map(s => [s.id, s])), inspectionById = new Map(inspections.map(x => [x.id, x])), workById = new Map(works.map(x => [x.id, x]));
+  const byInspection = new Map();
+  for (const e of emissions) if (e.vistoriaId !== v.id && inspectionById.has(e.vistoriaId)) { if (!byInspection.has(e.vistoriaId)) byInspection.set(e.vistoriaId, []); byInspection.get(e.vistoriaId).push(e); }
+  const verified = [];
+  for (const [vistoriaId, candidates] of [...byInspection].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
+    candidates.sort((a,b) => (Number(b.rev)||0)-(Number(a.rev)||0) || (Number(b.data)||0)-(Number(a.data)||0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const first=candidates[0], rev=Number(first.rev)||0, timestamp=Number(first.data)||0, tied=candidates.filter(e => (Number(e.rev)||0)===rev && (Number(e.data)||0)===timestamp), checked=[];
+    for (const emission of tied) { const snapshot=snapshotById.get(emission.snapshotId); let result; try { result=await SnapshotLib.verificarEmissao(emission,snapshot); } catch { result={estado:'divergente'}; } checked.push({snapshot,result}); }
+    if (!checked.length || checked.some(x => x.result.estado!=='verificado' || !x.snapshot?.conteudo)) continue;
+    const projection=x=>SnapshotLib.canonicalize({obra:x.snapshot.conteudo.obra,vistoria:x.snapshot.conteudo.vistoria,constatacoes:x.snapshot.conteudo.constatacoes,evidencias:x.snapshot.conteudo.evidencias});
+    if (checked.some(x=>projection(x)!==projection(checked[0]))) continue;
+    const content=checked[0].snapshot.conteudo, priorDate=content.vistoria?.data;
+    if (!validDate(priorDate) || priorDate>=currentDate || content.obra?.id!==v.obraId) continue;
+    verified.push({vistoriaId, content, priorDate});
+  }
+  verified.sort((a,b)=>b.priorDate.localeCompare(a.priorDate)||(a.vistoriaId<b.vistoriaId?-1:a.vistoriaId>b.vistoriaId?1:0));
+  const byFinding=new Map();
+  for (const item of verified) for (const finding of item.content.constatacoes||[]) {
+    if (!uuid.test(finding?.id||'') || finding.id===c?.id || byFinding.has(finding.id)) continue;
+    const work=workById.get(inspectionById.get(item.vistoriaId)?.obraId) || item.content.obra || {};
+    byFinding.set(finding.id,{id:finding.id,label:`${item.priorDate} · ${work.nome||'Edifício'} · ${finding.titulo||finding.tipo||'Constatação anterior'}`});
+  }
+  const rows=[...byFinding.values()].sort((a,b)=>a.label<b.label?1:a.label>b.label?-1:a.id<b.id?-1:1), truncated=rows.length>300;
+  return {rows:rows.slice(0,300),truncated};
+}
+
+async function constSheet(v, fotos, c) {
   const novo = !c; c = c || { id: DB.uid(), titulo: '', tipo: '', gravidade: 'Informativa', ambiente: '', local: '', descricao: '', recomendacao: '', fotoIds: [] };
+  const recurrence = await recurrenceChoices(v,c), uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const preserved = c.recorrenciaDeId && uuid.test(c.recorrenciaDeId) && !recurrence.rows.some(x=>x.id===c.recorrenciaDeId) ? `<option value="${esc(c.recorrenciaDeId)}" selected>Vínculo preservado; constatação anterior fora da lista</option>` : '';
   const el = modal(`<h2>${novo ? 'Nova constatação' : 'Constatação'}</h2>
     <label>Tipo de constatação</label><select data-f="tipo" id="tp">${optG(TIPOS_CONST, c.tipo)}</select>
     ${fld('Título *', 'titulo', c, { ph: 'Ex.: Fissura em viga de transição' })}
     <label>Gravidade</label><select data-f="gravidade">${GRAVS.map(g => `<option ${g === c.gravidade ? 'selected' : ''}>${g}</option>`).join('')}</select>
     <label>Ambiente</label><select data-f="ambiente">${optG(AMBIENTES, c.ambiente)}</select>
     ${fld('Local / elemento (detalhe)', 'local', c, { ph: 'Ex.: Pilar P12 – 2º pav.' })}${fld('Descrição', 'descricao', c, { area: 1, rows: 4 })}${fld('Recomendação', 'recomendacao', c, { area: 1, rows: 3 })}
+    <label for="recurrence-link">Vínculo explícito com constatação anterior (opcional)</label><select id="recurrence-link"><option value="">Sem vínculo declarado</option>${preserved}${recurrence.rows.map(x=>`<option value="${esc(x.id)}" ${c.recorrenciaDeId===x.id?'selected':''}>${esc(x.label)}</option>`).join('')}</select><p class="mut small">Selecione somente se a relação foi confirmada por uma pessoa. A lista oferece constatações verificadas anteriores do mesmo edifício; o aplicativo não deduz recorrência pelo texto. ${recurrence.truncated?'Lista limitada a 300 constatações verificadas. ':''}O vínculo será congelado em novas emissões.</p>
     <label>Fotos relacionadas (toque para marcar)</label><div class="photos" id="sp">${fotos.map((f, i) => `<div class="ph ${c.fotoIds.includes(f.id) ? 'sel' : ''}" data-id="${esc(f.id)}"><img src="${urlOf(f)}"><b>${pad(i + 1)}</b></div>`).join('') || '<span class="mut small">Tire fotos primeiro na aba Fotos.</span>'}</div>
     <div class="row" style="margin-top:14px"><button class="btn grow" id="ok">Salvar</button>${novo ? '' : '<button class="btn bad" id="dl">Excluir</button>'}<button class="btn ghost" id="x">Fechar</button></div>`);
   let tipoAnt = c.tipo;
   bindFields(el, c, () => { });
+  el.querySelector('#recurrence-link').addEventListener('change',e=>{if(e.target.value)c.recorrenciaDeId=e.target.value;else delete c.recorrenciaDeId;});
   el.querySelector('#tp').addEventListener('change', e => { const t = e.target.value, ti = el.querySelector('[data-f=titulo]'); if (t && ti && (!ti.value.trim() || ti.value === tipoAnt)) { ti.value = t; c.titulo = t; } tipoAnt = t; });
   el.querySelectorAll('[data-id]').forEach(p => p.onclick = () => { const id = p.dataset.id; c.fotoIds = c.fotoIds.includes(id) ? c.fotoIds.filter(x => x !== id) : [...c.fotoIds, id]; p.classList.toggle('sel'); });
   el.querySelector('#x').onclick = closeModal;
-  el.querySelector('#ok').onclick = async () => { if (!c.titulo.trim()) return toast('Informe o título'); v.constatacoes = v.constatacoes || []; if (novo) v.constatacoes.push(c); await patchV(v.id, 'constatacoes', v.constatacoes); closeModal(); route(); };
+  el.querySelector('#ok').onclick = async () => { if (!c.titulo.trim()) return toast('Informe o título'); if(c.recorrenciaDeId&&(!uuid.test(c.recorrenciaDeId)||c.recorrenciaDeId===c.id))return toast('O vínculo de recorrência deve apontar para outra constatação com ID válido.'); v.constatacoes = v.constatacoes || []; if (novo) v.constatacoes.push(c); await patchV(v.id, 'constatacoes', v.constatacoes); closeModal(); route(); };
   const d = el.querySelector('#dl'); if (d) d.onclick = async () => { if ((await DB.by('acoes','constatacaoId',c.id)).length) return toast('Exclua as ações declaradas vinculadas antes de excluir a constatação.'); if (!await confirmar('Excluir esta constatação?')) return; v.constatacoes = v.constatacoes.filter(x => x.id !== c.id); await patchV(v.id, 'constatacoes', v.constatacoes); closeModal(); route(); };
 }
 
@@ -620,12 +656,13 @@ async function vPainel(view) {
         <div class="kpi"><span>FORMALIZAÇÃO LOCAL</span><b>${Analytics.formatRatio(resumo.kpis.formalization)}</b><span>Vistorias com emissão / vistorias cadastradas</span></div>
         <div class="kpi"><span>INTEGRIDADE DO SNAPSHOT</span><b>${Analytics.formatRatio(resumo.kpis.snapshotIntegrity)}</b><span>Vistorias com snapshot verificado / vistorias com emissão</span></div>
         <div class="kpi"><span>CONSTATAÇÕES COM FOTO VINCULADA</span><b>${Analytics.formatRatio(resumo.kpis.photoAssociation)}</b><span>Constatações com foto existente / constatações verificáveis</span></div>
-        <div class="kpi"><span>GPS DE INÍCIO DISPONÍVEL</span><b>${Analytics.formatRatio(resumo.kpis.gpsAvailability)}</b><span>Indicador descritivo; não compõe nota de qualidade</span></div></div>
+        <div class="kpi"><span>GPS DE INÍCIO DISPONÍVEL</span><b>${Analytics.formatRatio(resumo.kpis.gpsAvailability)}</b><span>Indicador descritivo; não compõe nota de qualidade</span></div>
+        <div class="kpi"><span>VÍNCULOS EXPLÍCITOS DE RECORRÊNCIA DECLARADOS</span><b>${Analytics.formatRatio(resumo.kpis.recurrence)}</b><span>Constatações com vínculo selecionado por pessoa / constatações verificáveis; declaração local, sem inferência</span></div></div>
       <div class="grid2"><div><h3>Constatações por gravidade</h3>${listaDimensao(resumo.dimensions.severity)}<h3>Constatações por grupo do sistema (catálogo da interface)</h3>${listaDimensao(resumo.dimensions.systemGroup)}</div>
         <div><h3>Constatações por macroambiente (catálogo da interface)</h3>${listaDimensao(resumo.dimensions.environmentGroup)}<h3>Vistorias por mês</h3>${listaDimensao(resumo.dimensions.month)}</div></div>
       <div class="grid2"><div><h3>Lacunas cadastrais no inventário local</h3>${resumo.dataGaps.length ? `<ul class="small">${resumo.dataGaps.map(g => `<li>${esc(g.field)}: <b>${g.count}</b> · IDs: ${g.ids.map(id => `<code title="${esc(id)}">${esc(id.length > 15 ? id.slice(0, 8) + '…' + id.slice(-4) : id)}</code>`).join(', ')}${g.truncated ? ' · lista limitada aos 50 primeiros IDs' : ''}</li>`).join('')}</ul>` : '<p class="mut small">Nenhuma lacuna nos campos avaliados.</p>'}</div><div><h3>Candidatos a duplicata</h3>${!resumo.duplicateCandidatesAvailable ? '<p class="mut small">Indisponível neste contexto seguro; os demais indicadores seguem disponíveis.</p>' : resumo.duplicateCandidates.length ? `<p class="mut small">${resumo.duplicateCandidatesTotal} par(es); lista limitada a 200.</p><ul class="small">${resumo.duplicateCandidates.map(d => `<li><code title="${esc(d.vistoriaIdA)}">${esc(d.vistoriaIdA.slice(0, 8))}…</code> ↔ <code title="${esc(d.vistoriaIdB)}">${esc(d.vistoriaIdB.slice(0, 8))}…</code> · aviso, sem mescla</li>`).join('')}</ul>` : '<p class="mut small">Nenhum par candidato nesta janela.</p>'}</div></div>
       <div class="card"><b>Exportação local restrita</b><p class="mut small">Baixa apenas por ação explícita. O agregado não inclui texto livre, nomes, GPS ou fotos. O manifesto pode incluir IDs somente se a opção abaixo for marcada. Não compartilhe nem centralize sem aprovação de privacidade.</p><label><input type="checkbox" id="analytics-include-ids"> Incluir IDs estáveis no manifesto (desativado por padrão)</label><div class="row wrap"><button class="btn sec sm" id="analytics-export-aggregate">Baixar agregado analítico</button><button class="btn sec sm" id="analytics-export-manifest">Baixar manifesto de migração</button></div></div>
-      <div class="warnbox"><b>Não calculado:</b> recorrência (não há vínculo estruturado entre achados), saneamento verificado (as ações são declarações locais, sem comprovação de execução) e risco (rubrica de probabilidade/impacto não aprovada). ${resumo.counts.periodUnverifiedLatestEmissions} vistoria(s) da janela com emissão mais recente sem snapshot verificável ou com snapshots empatados divergentes foram excluídas das dimensões. ${resumo.stale.inspectionsEditedAfterEmission} vistoria(s) foram editadas após a emissão considerada; os indicadores refletem o conteúdo congelado na emissão.</div>
+      <div class="warnbox"><b>Limites do indicador:</b> recorrência conta somente vínculos explícitos declarados por usuário (sem inferência automática); saneamento verificado não é calculado; risco não é calculado porque falta rubrica aprovada de probabilidade/impacto. ${resumo.counts.periodUnverifiedLatestEmissions} vistoria(s) da janela com emissão mais recente sem snapshot verificável ou com snapshots empatados divergentes foram excluídas das dimensões. ${resumo.stale.inspectionsEditedAfterEmission} vistoria(s) foram editadas após a emissão considerada; os indicadores refletem o conteúdo congelado na emissão.</div>
     </section>`;
   view.innerHTML = `
     <div class="kpis"><div class="kpi"><b>${new Set(F.map(v => v.obraId)).size}</b><span>EDIFÍCIOS</span></div><div class="kpi"><b>${F.length}</b><span>VISTORIAS</span></div><div class="kpi"><b>${F.filter(v => v.status === 'emitido').length}</b><span>EMITIDAS</span></div><div class="kpi"><b>${F.filter(v => v.status !== 'emitido').length}</b><span>EM RASCUNHO</span></div><div class="kpi"><b>${nFotos}</b><span>FOTOS</span></div><div class="kpi"><b>${E.length}</b><span>LINHAS DE EMISSÃO</span></div></div>

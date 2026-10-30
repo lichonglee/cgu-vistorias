@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 1.4.0 · 30/10/2026
+
+- Campo opcional `recorrenciaDeId` permite declarar vínculo humano explícito entre constatações; sem inferência automática por texto, edifício ou data. Novas emissões congelam o vínculo no snapshot e o backup v1 valida UUID e rejeita autorreferência.
+- O painel local apresenta vínculos explícitos / constatações verificáveis; o agregado exportado contém somente numerador e denominador, nunca os IDs relacionados.
+- O IndexedDB permanece no esquema v3: não há nova store nem migração. Antes de atualizar, faça backup. A versão 1.3.0 rejeita o novo campo opcional se ele estiver em constatações no backup; após emissão com novos vínculos, downgrade e restauração na 1.3.0 não são compatíveis.
+- Esta candidata ainda não é release: PDF e QA de navegador/dispositivo e gates institucionais permanecem pendentes.
+
 ## 1.3.0 · 30/10/2026
 
 - Ações corretivas declaradas localmente por constatação de snapshot verificado, com função responsável, prazo, estado, data de conclusão e observação.

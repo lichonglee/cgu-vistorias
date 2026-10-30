@@ -136,6 +136,9 @@
         if (!c.emissao || c.emissao.tipo !== s.tipo || c.emissao.rev !== s.rev) erros.push('tipo/rev divergem do conteúdo');
         if (!Array.isArray(c.constatacoes) || !Array.isArray(c.evidencias)) erros.push('constatacoes/evidencias ausentes');
         else {
+          for (const finding of c.constatacoes) {
+            if (finding?.recorrenciaDeId != null && (typeof finding.recorrenciaDeId !== 'string' || !UUID.test(finding.recorrenciaDeId) || finding.recorrenciaDeId === finding.id)) erros.push('recorrenciaDeId inválido ou autorreferente');
+          }
           if (c.evidencias.some(e => !e || !HEX64.test(e.sha256 || ''))) erros.push('evidência sem sha256');
           const ids = c.evidencias.map(e => e && e.id);
           if (new Set(ids).size !== ids.length) erros.push('evidências com id repetido');
