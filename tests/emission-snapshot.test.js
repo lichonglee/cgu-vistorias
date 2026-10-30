@@ -14,6 +14,9 @@ function cenario() {
   vistoria.constatacoes[0].fotoIds = [foto.id];
   return { obra, vistoria, fotos: [foto], cfg: { empresa: { nome: 'CGU' }, rt: { nome: 'RT' }, usuario: 'u' }, emissao: { tipo: 'tecnico', numero: { seq: 7, ano: 2026 }, rev: 0 }, appVersion: '1.0.6' };
 }
+/* linha de emissões coerente com o snapshot, como o app grava */
+const linha = (snap, extra = {}) => ({ id: snap.emissaoId, vistoriaId: snap.vistoriaId, obraId: snap.obraId, tipo: snap.tipo, formato: snap.formato, rev: snap.rev,
+  numero: `${{ tecnico: 'VT', fotografico: 'MF', consolidado: 'RC' }[snap.tipo]}-${String(snap.numero.seq).padStart(3, '0')}/${snap.numero.ano}`, arquivo: 'VT-007-2026_Rev00.pdf', snapshotId: snap.id, snapshotHash: snap.hash, ...extra });
 async function emitido(c = cenario()) {
   const conteudo = await S.capturar(c);
   return { c, snap: await S.criar({ id: U(), emissaoId: U(), formato: 'pdf', conteudo, appVersion: '1.0.6' }) };
@@ -89,7 +92,7 @@ test('adulteração é detectada: conteúdo, hash, vínculo, schema, id inválid
 });
 test('hash forjado: conteúdo alterado com hash recalculado passa em validar, mas é pego pelo hash gravado na emissão', async () => {
   const { snap } = await emitido();
-  const em = { id: snap.emissaoId, snapshotId: snap.id, snapshotHash: snap.hash };
+  const em = linha(snap);
   const forjado = clonar(snap);
   forjado.conteudo.constatacoes[0].gravidade = 'Informativa';
   forjado.hash = await S.hashSnapshot(forjado);
@@ -109,7 +112,7 @@ test('emissões legadas: sem snapshot => estado legado explícito, nada fabricad
 });
 test('verificarEmissao: ausente, divergente, verificado', async () => {
   const { snap } = await emitido();
-  const em = { id: snap.emissaoId, snapshotId: snap.id, snapshotHash: snap.hash };
+  const em = linha(snap);
   assert.equal((await S.verificarEmissao(em, null)).estado, 'ausente');
   assert.equal((await S.verificarEmissao(em, snap)).estado, 'verificado');
   assert.equal((await S.verificarEmissao({ ...em, snapshotHash: '1'.repeat(64) }, snap)).estado, 'divergente');
@@ -144,7 +147,7 @@ const pdfBlob = (extra = '') => new Blob(['%PDF-1.7\n' + 'conteudo' + extra], { 
 async function comArquivo(b = pdfBlob()) {
   const { c, snap } = await emitido();
   const arq = await S.criarArquivo({ id: U(), snapshot: snap, arquivo: 'VT-007-2026_Rev00.pdf', blob: b });
-  const em = { id: snap.emissaoId, snapshotId: snap.id, snapshotHash: snap.hash, arquivoSha256: arq.sha256 };
+  const em = linha(snap, { arquivoSha256: arq.sha256, arquivoId: arq.id, arquivo: arq.arquivo });
   return { c, snap, arq, em };
 }
 test('arquivo emitido: criação, hash dos bytes e verificação', async () => {
@@ -182,7 +185,7 @@ test('docx: mime e assinatura PK', async () => {
   const snap = await S.criar({ id: U(), emissaoId: U(), formato: 'docx', conteudo: await S.capturar(c), appVersion: '1.0.6' });
   const arq = await S.criarArquivo({ id: U(), snapshot: snap, arquivo: 'a.docx', blob: new Blob([Buffer.from([0x50, 0x4b, 3, 4, 9])]) });
   assert.equal(arq.mime, S.MIMES.docx);
-  assert.equal((await S.verificarArquivo({ id: snap.emissaoId, arquivoSha256: arq.sha256 }, snap, arq)).estado, 'verificado');
+  assert.equal((await S.verificarArquivo(linha(snap, { arquivoSha256: arq.sha256, arquivo: 'a.docx' }), snap, arq)).estado, 'verificado');
 });
 test('consistência do envelope: numero, appVersion, evidências e refs são conferidos', async () => {
   const { snap } = await emitido();
@@ -214,4 +217,26 @@ test('app.js: emitir clona o contexto antes dos awaits e snapshot/relatório usa
   assert.match(corpo, /settings: C\.S, obra: C\.obra, vistoria: C\.vistoria, fotos: C\.fotos/);
   assert.match(corpo, /Rep\.toDocx\(model, C\.S, logo\) : await Rep\.toPdf\(model, C\.S, logo\)/);
   assert.doesNotMatch(corpo.replace(/C\.S/g, ''), /\bS\.(empresa|rt|usuario)/);
+});
+
+test('verificarEmissao: cada metadado da linha mutado diverge do snapshot', async () => {
+  const { snap } = await emitido();
+  const em = linha(snap);
+  assert.equal((await S.verificarEmissao(em, snap)).estado, 'verificado');
+  for (const [campo, v] of [['vistoriaId', 'outra-vistoria-1'], ['obraId', 'outra-obra-0001'], ['tipo', 'consolidado'], ['formato', 'docx'], ['rev', 1],
+    ['numero', 'VT-008/2026'], ['numero', 'VT-007/2025'], ['numero', 'MF-007/2026'], ['numero', 'RASCUNHO'], ['numero', null]]) {
+    const r = await S.verificarEmissao({ ...em, [campo]: v }, snap);
+    assert.equal(r.estado, 'divergente', campo + '=' + v); assert.match(r.detalhe, new RegExp(campo));
+  }
+});
+test('verificarArquivo: arquivoId, nome, formato e extensão da emissão são conferidos', async () => {
+  const { snap, arq, em } = await comArquivo();
+  assert.equal((await S.verificarArquivo(em, snap, arq)).estado, 'verificado');
+  for (const [nome, e, a] of [
+    ['arquivoId', { ...em, arquivoId: U() }, arq],
+    ['nome', { ...em, arquivo: 'outro.pdf' }, arq],
+    ['nome ausente', { ...em, arquivo: undefined }, arq],
+    ['formato', { ...em, formato: 'docx' }, arq],
+    ['extensão', { ...em, arquivo: 'x.docx' }, { ...arq, arquivo: 'x.docx' }]
+  ]) assert.equal((await S.verificarArquivo(e, snap, a)).estado, 'divergente', nome);
 });

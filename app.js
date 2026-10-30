@@ -505,7 +505,7 @@ async function emitir(vid, tipo, fmt, oficial, novaRev) {
   for (const f of fotos) f.bytes = new Uint8Array(await f.blob.arrayBuffer());
   let rev = 0, numero = null;
   if (oficial) {
-    if (!v.seq) { v.ano = new Date().getFullYear(); v.seq = await DB.nextSeq(v.ano); const x = await DB.get('vistorias', vid); x.ano = v.ano; x.seq = v.seq; await DB.put('vistorias', x); }
+    const r = await DB.reservarNumeracao(vid, new Date().getFullYear()); v.seq = r.seq; v.ano = r.ano;
     numero = { seq: v.seq, ano: v.ano };
     const ant = (await DB.by('emissoes', 'vistoriaId', vid)).filter(e => e.tipo === tipo);
     if (ant.length) rev = Math.max(...ant.map(e => e.rev)) + (novaRev ? 1 : 0);

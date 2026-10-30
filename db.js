@@ -54,6 +54,27 @@ const DB = (() => {
         t.oncomplete = () => res(em); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
       });
     },
+    /* Reserva atômica da numeração LOCAL: devolve o seq já gravado na vistoria ou reserva o próximo do ano e grava a
+       vistoria, tudo numa transação readwrite sobre ['vistorias','settings'] (serializa entre abas do mesmo aparelho).
+       Sem await de promessas alheias dentro da transação, senão ela confirma antes. Não garante unicidade entre aparelhos. */
+    reservarNumeracao(vistoriaId, ano) {
+      return new Promise((res, rej) => {
+        const t = db.transaction(['vistorias', 'settings'], 'readwrite'); let out;
+        const vs = t.objectStore('vistorias'), cf = t.objectStore('settings');
+        t.oncomplete = () => res(out); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error('transação abortada'));
+        vs.get(vistoriaId).onsuccess = e => {
+          const v = e.target.result;
+          if (!v) { t.abort(); return; }
+          if (v.seq) { out = { seq: v.seq, ano: v.ano }; return; }
+          const k = 'seq-' + ano;
+          cf.get(k).onsuccess = ev => {
+            const n = (ev.target.result ? ev.target.result.value : 0) + 1;
+            cf.put({ key: k, value: n });
+            v.seq = n; v.ano = ano; vs.put(v); out = { seq: n, ano };
+          };
+        };
+      });
+    },
     async nextSeq(ano) {
       const k = 'seq-' + ano; const n = (await this.getSetting(k, 0)) + 1;
       await this.setSetting(k, n); return n;

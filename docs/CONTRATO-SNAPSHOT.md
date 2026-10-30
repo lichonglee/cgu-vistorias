@@ -74,3 +74,10 @@ Guarda o PDF/DOCX **exato** entregue ao usuário, pois o snapshot guarda hashes 
 - Excluir vistoria/edifício deixa snapshots e arquivos emitidos (cópia com GPS e relatório completo): decisão de retenção/descarte pendente [DONO].
 - Arquivos emitidos podem ser grandes (PDF com fotos); sem política de limpeza.
 - Mudar `CGU.version` exige atualizar `sw.js` (`brand.js?v=`); esta entrega não altera versões globais.
+
+## Rodada final: metadados da linha e numeração local
+
+- `verificarEmissao` compara também `vistoriaId`, `obraId`, `tipo`, `formato`, `rev` e `numero` da linha em `emissoes` com o envelope autenticado do snapshot. `numero` da emissão é o texto impresso (`VT|MF|RC-nnn/aaaa`, prefixo coerente com `tipo`); no snapshot é `{seq, ano}`. Qualquer divergência ⇒ `divergente` (a linha de `emissoes` não é coberta pelo hash, então precisa ser conferida contra ele).
+- `verificarArquivo` confere ainda `arquivoId` (se presente), `arquivo` (nome registrado), extensão e `formato` da emissão vs snapshot, além de mime/assinatura/sha256.
+- **Numeração local atômica:** `DB.reservarNumeracao(vistoriaId, ano)` roda numa única transação `readwrite` sobre `['vistorias','settings']`: devolve o `seq/ano` já gravados na vistoria ou reserva o próximo do contador `seq-<ano>` e grava a vistoria na mesma transação. `emitir` usa só esse helper. Isso serializa abas do mesmo aparelho; **a numeração continua sem unicidade entre aparelhos** (dois aparelhos podem emitir o mesmo VT-nnn/aaaa) até existir reserva central. `DB.nextSeq` permanece (get+set separados, não atômico) apenas por compatibilidade e não é usado na emissão.
+- Testes de banco usam `fake-indexeddb` fora do repositório (`FAKE_IDB=<caminho>`); sem ele são pulados. Não substituem o teste em navegador real.

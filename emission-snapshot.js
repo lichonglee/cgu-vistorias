@@ -178,6 +178,10 @@
         if (arq.snapshotId !== snapshot.id) erros.push('snapshotId diverge');
         if (arq.emissaoId !== snapshot.emissaoId || arq.emissaoId !== emissao.id) erros.push('emissaoId diverge');
         if (arq.mime !== MIMES[snapshot.formato]) erros.push('mime diverge do formato');
+        if (emissao.formato !== snapshot.formato) erros.push('formato da emissão diverge do snapshot');
+        if (emissao.arquivoId !== undefined && emissao.arquivoId !== arq.id) erros.push('arquivoId diverge');
+        if (typeof emissao.arquivo !== 'string' || arq.arquivo !== emissao.arquivo) erros.push('nome do arquivo diverge da emissão');
+        if (!String(arq.arquivo).toLowerCase().endsWith('.' + snapshot.formato)) erros.push('extensão não corresponde ao formato');
         if (!(await startsWith(arq.blob, MAGIC[snapshot.formato] || [0]))) erros.push('assinatura do arquivo não corresponde ao formato');
       }
       if (!(arq.blob instanceof Blob)) erros.push('blob ausente');
@@ -192,6 +196,17 @@
     return erros.length ? { estado: 'divergente', detalhe: erros.join('; ') } : { estado: 'verificado', detalhe: 'SHA-256 do arquivo confere.' };
   }
 
+  const PREFIXO = { tecnico: 'VT', fotografico: 'MF', consolidado: 'RC' };
+  /* A linha de emissões não é coberta pelo hash; seus metadados têm de coincidir com o envelope autenticado.
+     numero da emissão é o texto impresso (VT/MF/RC-nnn/aaaa); no snapshot é {seq, ano}. */
+  function metadadosDivergentes(e, s) {
+    const d = [];
+    for (const k of ['vistoriaId', 'obraId', 'tipo', 'formato', 'rev']) if (e[k] !== s[k]) d.push(k);
+    const m = /^(VT|MF|RC)-(\d{3,})\/(\d{4})$/.exec(typeof e.numero === 'string' ? e.numero : '');
+    if (!m || m[1] !== PREFIXO[s.tipo] || Number(m[2]) !== (s.numero && s.numero.seq) || Number(m[3]) !== (s.numero && s.numero.ano)) d.push('numero');
+    return d;
+  }
+
   /* Estado de uma emissão perante seu snapshot:
      'legado' (emissão sem snapshotId: anterior ao recurso, sem snapshot verificável),
      'ausente' (referencia snapshot que não existe), 'divergente', 'verificado'. */
@@ -200,6 +215,8 @@
     if (!snapshot) return { estado: 'ausente', detalhe: 'Snapshot referenciado não encontrado neste aparelho.' };
     if (snapshot.id !== emissao.snapshotId || snapshot.emissaoId !== emissao.id) return { estado: 'divergente', detalhe: 'Snapshot não pertence a esta emissão.' };
     if (snapshot.hash !== emissao.snapshotHash) return { estado: 'divergente', detalhe: 'Hash da emissão difere do snapshot.' };
+    const dif = metadadosDivergentes(emissao, snapshot);
+    if (dif.length) return { estado: 'divergente', detalhe: 'Linha da emissão diverge do snapshot: ' + dif.join(', ') + '.' };
     const v = await validar(snapshot);
     return v.ok ? { estado: 'verificado', detalhe: 'SHA-256 confere.' } : { estado: 'divergente', detalhe: v.erros.join('; ') };
   }
