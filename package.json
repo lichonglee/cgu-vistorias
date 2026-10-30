@@ -1,0 +1,8 @@
+{
+  "name": "cgu-vistorias",
+  "version": "1.0.6",
+  "private": true,
+  "description": "Verificação da distribuição estática e dos módulos locais do CGU Vistorias",
+  "engines": { "node": ">=24" },
+  "scripts": { "test": "node --test", "check": "node --test tests/distribution.test.cjs" }
+}
