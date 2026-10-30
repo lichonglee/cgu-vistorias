@@ -1,17 +1,18 @@
 /* CGU Vistorias — camada de dados local (IndexedDB). Tudo fica no próprio aparelho. */
 const DB = (() => {
   let db;
-  const NAME = 'cgu-vistorias', VER = 1;
+  const NAME = 'cgu-vistorias', VER = 2;
   function open() {
     return new Promise((res, rej) => {
       const r = indexedDB.open(NAME, VER);
       r.onupgradeneeded = e => {
         const d = e.target.result;
-        d.createObjectStore('obras', { keyPath: 'id' });
-        d.createObjectStore('vistorias', { keyPath: 'id' }).createIndex('obraId', 'obraId');
-        d.createObjectStore('fotos', { keyPath: 'id' }).createIndex('vistoriaId', 'vistoriaId');
-        d.createObjectStore('emissoes', { keyPath: 'id' }).createIndex('vistoriaId', 'vistoriaId');
-        d.createObjectStore('settings', { keyPath: 'key' });
+        if (!d.objectStoreNames.contains('obras')) d.createObjectStore('obras', { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('vistorias')) d.createObjectStore('vistorias', { keyPath: 'id' }).createIndex('obraId', 'obraId');
+        if (!d.objectStoreNames.contains('fotos')) d.createObjectStore('fotos', { keyPath: 'id' }).createIndex('vistoriaId', 'vistoriaId');
+        if (!d.objectStoreNames.contains('emissoes')) d.createObjectStore('emissoes', { keyPath: 'id' }).createIndex('vistoriaId', 'vistoriaId');
+        if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings', { keyPath: 'key' });
+        if (!d.objectStoreNames.contains('snapshots')) { const sn = d.createObjectStore('snapshots', { keyPath: 'id' }); sn.createIndex('vistoriaId', 'vistoriaId'); sn.createIndex('emissaoId', 'emissaoId'); }
       };
       r.onsuccess = () => { db = r.result; res(); };
       r.onerror = () => rej(r.error);
@@ -36,6 +37,16 @@ const DB = (() => {
     async delObra(id) {
       for (const v of await this.by('vistorias', 'obraId', id)) await this.delVistoria(v.id);
       await this.del('obras', id);
+    },
+    /* Snapshots são imutáveis: add() falha (ConstraintError) se o id já existir; não há put/del. */
+    addSnapshot: sn => w(st('snapshots', 'readwrite').add(sn)),
+    /* Grava snapshot e emissão na mesma transação: ou os dois ou nenhum. */
+    registrarEmissao(sn, em) {
+      return new Promise((res, rej) => {
+        const t = db.transaction(['snapshots', 'emissoes'], 'readwrite');
+        t.objectStore('snapshots').add(sn); t.objectStore('emissoes').put(em);
+        t.oncomplete = () => res(em); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+      });
     },
     async nextSeq(ano) {
       const k = 'seq-' + ano; const n = (await this.getSetting(k, 0)) + 1;
