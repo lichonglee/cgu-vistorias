@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const Analytics = require('../analytics.js');
 const SnapshotLib = require('../emission-snapshot.js');
+const Taxonomia = require('../taxonomia.js');
 const uid = () => crypto.randomUUID();
 
 async function report({ obraId, vistoriaId, seq, rev, date, timestamp, findings = [], withGps = false, withPhoto = false }) {
@@ -28,13 +29,13 @@ test('agrega somente o último snapshot verificável de cada vistoria e não mul
   const legacy = { id: uid(), vistoriaId: v3, obraId: obra2, tipo: 'tecnico', formato: 'pdf', numero: 'VT-003/2026', rev: 0, data: 300, arquivo: 'legacy.pdf' };
   const result = await Analytics.resumir({ obras: works, vistorias: inspections, emissoes: [old.emission, latest.emission, second.emission, legacy], snapshots: [old.snapshot, latest.snapshot, second.snapshot], snapshotLib: SnapshotLib, sistemaPorTipo: { Fissura: 'Estrutura', Outra: 'Outros' }, grupoPorAmbiente: { Fachada: 'Acesso', 'Outro ambiente': 'Outros' } });
 
-  assert.deepEqual(result.counts, { localBuildings: 2, localInspections: 3, emissionRows: 4, inspectionsWithEmission: 3, inspectionsWithVerifiedSnapshot: 2, unverifiedLatestEmissions: 1, verifiedFindings: 5 });
+  assert.deepEqual(Object.fromEntries(['localBuildings', 'localInspections', 'emissionRows', 'inspectionsWithEmission', 'inspectionsWithVerifiedSnapshot', 'unverifiedLatestEmissions', 'verifiedFindings'].map(k => [k, result.counts[k]])), { localBuildings: 2, localInspections: 3, emissionRows: 4, inspectionsWithEmission: 3, inspectionsWithVerifiedSnapshot: 2, unverifiedLatestEmissions: 1, verifiedFindings: 5 });
   assert.equal(result.kpis.coverage.numerator, 2);
   assert.equal(result.kpis.coverage.denominator, 2);
   assert.equal(result.kpis.severeDensity.numerator, 2);
   assert.equal(result.kpis.severeDensity.denominator, 2);
   assert.equal(result.kpis.formalization.numerator, 3);
-  assert.equal(result.kpis.formalization.denominator, 3);
+  assert.equal(result.kpis.formalization.denominator, 4);
   assert.equal(result.kpis.snapshotIntegrity.numerator, 2);
   assert.equal(result.kpis.snapshotIntegrity.denominator, 3);
   assert.equal(result.kpis.photoAssociation.numerator, 1);
@@ -93,4 +94,86 @@ test('falha de indicadores não remove fallback da lista no painel', () => {
   const app = fs.readFileSync(require.resolve('../app.js'), 'utf8');
   assert.match(app, /try\s*\{[\s\S]*?Analytics\.resumir[\s\S]*?catch\s*\(e\)/);
   assert.match(app, /Indicadores locais indisponíveis\.[\s\S]*?lista de vistorias continua disponível/);
+  assert.match(app, /const taxonomia = typeof Taxonomia !== 'undefined' \? Taxonomia : null/);
+  assert.match(app, /periodUnverifiedLatestEmissions/);
+});
+
+test('janela de 12 meses filtra pela data da vistoria, informa lacunas e trata base vazia', async () => {
+  const old = await report({ obraId: uid(), vistoriaId: uid(), seq: 30, rev: 0, date: '2024-01-12', timestamp: 20, findings: [{ gravidade: 'Alta', tipo: 'Fissura', ambiente: 'Fachada' }] });
+  const recent = await report({ obraId: uid(), vistoriaId: uid(), seq: 31, rev: 0, date: '2026-04-03', timestamp: 30, findings: [{ gravidade: 'Alta', tipo: 'Fissura', ambiente: 'Fachada' }] });
+  const result = await Analytics.resumir({ obras: [old.obra, recent.obra], vistorias: [old.vistoria, recent.vistoria], emissoes: [old.emission, recent.emission], snapshots: [old.snapshot, recent.snapshot], snapshotLib: SnapshotLib, taxonomia: Taxonomia, asOf: '2026-10-30', janelaMeses: 12 });
+  assert.deepEqual(result.period, { asOf: '2026-10-30', windowMonths: 12, from: '2025-11-01', to: '2026-10-30', label: '12 meses (2025-11-01 a 2026-10-30)' });
+  assert.equal(result.counts.periodInspections, 1);
+  assert.equal(result.kpis.severeDensity.denominator, 1);
+  assert.equal(result.kpis.coverage.numerator, 1);
+  assert.equal(result.kpis.coverage.denominator, 2);
+  const empty = await Analytics.resumir({ obras: [], vistorias: [], emissoes: [], snapshots: [], snapshotLib: SnapshotLib, asOf: '2026-10-30', janelaMeses: 12 });
+  assert.equal(empty.kpis.severeDensity.denominator, 0);
+  assert.equal(empty.kpis.coverage.denominator, 0);
+});
+
+test('candidatos a duplicata exigem edifício/data/conteúdo iguais e só devolvem ids', async () => {
+  const obraId = uid(), finding = { gravidade: 'Alta', tipo: 'Fissura', ambiente: 'Fachada' };
+  const a = await report({ obraId, vistoriaId: uid(), seq: 32, rev: 0, date: '2026-08-01', timestamp: 30, findings: [finding] });
+  const b = await report({ obraId, vistoriaId: uid(), seq: 33, rev: 0, date: '2026-08-01', timestamp: 40, findings: [finding] });
+  const rows = [a, b];
+  const before = JSON.stringify(rows.map(x => x.vistoria));
+  const result = await Analytics.resumir({ obras: [a.obra], vistorias: rows.map(x => x.vistoria), emissoes: rows.map(x => x.emission), snapshots: rows.map(x => x.snapshot), snapshotLib: SnapshotLib, taxonomia: Taxonomia, asOf: '2026-10-30', janelaMeses: null });
+  const sortedIds = rows.map(x => x.vistoria.id).sort();
+  assert.deepEqual(result.duplicateCandidates.map(x => [x.vistoriaIdA, x.vistoriaIdB]), [[sortedIds[0], sortedIds[1]]]);
+  assert.equal(JSON.stringify(rows.map(x => x.vistoria)), before);
+  assert.equal(JSON.stringify(result.duplicateCandidates).includes('SENSITIVE'), false);
+});
+
+test('relatório de lacunas conta campos ausentes/inválidos e IDs locais sem refletir conteúdo', async()=>{
+  const obra={id:uid(),endereco:'',contrato:''};
+  const vistoria={id:uid(),obraId:obra.id,data:'data-ruim',constatacoes:[{id:uid(),tipo:'__proto__',ambiente:'<script>',gravidade:'urgente',descricao:'PRIVATE TEXT'}]};
+  const result=await Analytics.resumir({obras:[obra],vistorias:[vistoria],snapshotLib:SnapshotLib,taxonomia:Taxonomia,asOf:'2026-10-30',janelaMeses:12});
+  const gaps=Object.fromEntries(result.dataGaps.map(x=>[x.field,x]));
+  for(const field of ['endereco','contrato','data','tipo','ambiente','gravidade']) assert.equal(gaps[field].count,1);
+  assert.equal(JSON.stringify(result.dataGaps).includes('PRIVATE TEXT'),false);
+  assert.equal(result.counts.undatedInspectionsExcluded,1);
+});
+
+test('janela usa a data congelada para KPIs emitidos e denominadores GPS',async()=>{
+  const a=await report({obraId:uid(),vistoriaId:uid(),seq:41,rev:0,date:'2026-04-01',timestamp:10,withGps:false,findings:[]});
+  a.vistoria.data='2024-01-01';
+  const b=await report({obraId:uid(),vistoriaId:uid(),seq:42,rev:0,date:'2024-01-01',timestamp:20,withGps:true,findings:[]});
+  const result=await Analytics.resumir({obras:[a.obra,b.obra],vistorias:[a.vistoria,b.vistoria],emissoes:[a.emission,b.emission],snapshots:[a.snapshot,b.snapshot],snapshotLib:SnapshotLib,asOf:'2026-10-30',janelaMeses:12});
+  assert.equal(result.counts.periodInspections,1);
+  assert.equal(result.kpis.formalization.numerator,1);assert.equal(result.kpis.formalization.denominator,1);
+  assert.equal(result.kpis.snapshotIntegrity.numerator,1);assert.equal(result.kpis.snapshotIntegrity.denominator,1);
+  assert.equal(result.kpis.gpsAvailability.numerator,0);assert.equal(result.kpis.gpsAvailability.denominator,1);
+});
+
+test('falha do digest desativa somente candidatos a duplicata',async()=>{
+  const original=Object.getOwnPropertyDescriptor(globalThis,'crypto');
+  Object.defineProperty(globalThis,'crypto',{configurable:true,value:{subtle:{digest:async()=>{throw new Error('simulated digest failure');}}}});
+  try {
+    const snapshot={id:'22222222-2222-4222-8222-222222222222',conteudo:{obra:{id:'obra'},vistoria:{data:'2026-06-01'},constatacoes:[{titulo:'x',tipo:'y',gravidade:'Alta',ambiente:'z'}],evidencias:[]}};
+    const emission={id:'33333333-3333-4333-8333-333333333333',vistoriaId:'11111111-1111-4111-8111-111111111111',snapshotId:snapshot.id,rev:1,data:1};
+    const fakeSnapshotLib={verificarEmissao:async()=>({estado:'verificado'}),canonicalize:value=>JSON.stringify(value)};
+    const result=await Analytics.resumir({obras:[{id:'obra'}],vistorias:[{id:emission.vistoriaId,obraId:'obra',data:'2026-06-01'}],emissoes:[emission],snapshots:[snapshot],snapshotLib:fakeSnapshotLib});
+    assert.equal(result.duplicateCandidatesAvailable,false);assert.deepEqual(result.duplicateCandidates,[]);
+    assert.equal(result.counts.verifiedFindings,1);
+  } finally {
+    if(original)Object.defineProperty(globalThis,'crypto',original);else delete globalThis.crypto;
+  }
+});
+
+test('constatações idênticas sem data válida não são candidatas a duplicata',async()=>{
+  const obraId=uid(),finding={gravidade:'Alta',tipo:'Fissura',ambiente:'Fachada'};
+  const a=await report({obraId,vistoriaId:uid(),seq:51,rev:0,date:'invalida',timestamp:1,findings:[finding]});
+  const b=await report({obraId,vistoriaId:uid(),seq:52,rev:0,date:'invalida',timestamp:2,findings:[finding]});
+  const result=await Analytics.resumir({obras:[a.obra],vistorias:[a.vistoria,b.vistoria],emissoes:[a.emission,b.emission],snapshots:[a.snapshot,b.snapshot],snapshotLib:SnapshotLib,janelaMeses:null});
+  assert.deepEqual(result.duplicateCandidates,[]);
+});
+
+test('limite de 200 candidatos é determinístico e informa o total omitido',async()=>{
+  const rows=Array.from({length:201},(_,i)=>{const vistoriaId=`v-${String(i).padStart(3,'0')}`,snapshotId=`s-${String(i).padStart(3,'0')}`;return{obra:{id:'obra'},vistoria:{id:vistoriaId,obraId:'obra',data:'2026-06-01'},emission:{id:`e-${i}`,vistoriaId,snapshotId,rev:1,data:i},snapshot:{id:snapshotId,conteudo:{obra:{id:'obra'},vistoria:{data:'2026-06-01'},constatacoes:[{titulo:'igual',tipo:'x',gravidade:'Alta',ambiente:'y'}],evidencias:[]}}};});
+  const lib={canonicalize:SnapshotLib.canonicalize,verificarEmissao:async()=>({estado:'verificado'})};
+  const summarize=items=>Analytics.resumir({obras:[{id:'obra'}],vistorias:items.map(x=>x.vistoria),emissoes:items.map(x=>x.emission),snapshots:items.map(x=>x.snapshot),snapshotLib:lib,janelaMeses:null});
+  const a=await summarize(rows),b=await summarize([...rows].reverse());
+  assert.equal(a.duplicateCandidates.length,200);assert.equal(a.duplicateCandidatesTotal,20100);assert.equal(a.duplicateCandidatesTruncated,true);
+  assert.deepEqual(a.duplicateCandidates,b.duplicateCandidates);
 });

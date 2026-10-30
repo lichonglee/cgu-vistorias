@@ -385,7 +385,7 @@ async function vObra(view, id) {
   bindGo(view);
   $('#eo').onclick = () => obraSheet(o);
   $('#xo').onclick = () => exportBackup(o.id);
-  $('#do').onclick = async () => { if (await confirmar(`Excluir o edifício "${o.nome}" e TODAS as suas vistorias e fotos? Não há como desfazer.`)) { await DB.delObra(o.id); location.hash = '#/'; } };
+  $('#do').onclick = async () => { if (await confirmar(`Excluir o edifício "${o.nome}" e suas vistorias e fotos locais? Emissões, snapshots e arquivos emitidos podem permanecer retidos conforme a política institucional ainda pendente. Não há como desfazer.`)) { await DB.delObra(o.id); location.hash = '#/'; } };
   $('#nv').onclick = async () => {
     const v = { id: DB.uid(), obraId: o.id, local: '', tipo: TIPOS[0], data: hoje(), hora: agora(), participantes: S.usuario || '', clima: '', objetivo: '', metodologia: METOD, documentos: '', descricao: '', constatacoes: [], conclusao: '', recomendacoes: '', status: 'rascunho', nFotos: 0, gps: null, criadoEm: Date.now(), updatedAt: Date.now() };
     await DB.put('vistorias', v); tab = 'dados'; location.hash = '#/vistoria/' + v.id;
@@ -417,7 +417,7 @@ async function vVistoria(view, id) {
       <button class="btn bad sm" id="dv">Excluir vistoria</button>`;
     bindFields(tb, v, async (p, val) => { await save(p, val); if (p === 'local') setTitle(v.local || 'Nova vistoria', '#/obra/' + o.id); });
     $('#gps').onclick = async () => { toast('Obtendo localização…'); const p = await getPos(); if (!p) return toast('Não foi possível obter o GPS. Verifique a permissão.', 4000); v.gps = p; await patchV(v.id, 'gps', p); route(); };
-    $('#dv').onclick = async () => { if (await confirmar('Excluir esta vistoria e suas fotos?')) { await DB.delVistoria(v.id); location.hash = '#/obra/' + o.id; } };
+    $('#dv').onclick = async () => { if (await confirmar('Excluir esta vistoria e suas fotos locais? Emissões, snapshots e arquivos emitidos podem permanecer retidos conforme a política institucional ainda pendente. Não há como desfazer.')) { await DB.delVistoria(v.id); location.hash = '#/obra/' + o.id; } };
   }
   if (tab === 'fotos') {
     tb.innerHTML = `<div class="row"><button class="btn grow" id="cam">${CGU.icon("camera")} Tirar foto</button><button class="btn sec grow" id="gal">${CGU.icon("image")} Da galeria</button></div>
@@ -542,6 +542,7 @@ async function compartilhar(blob, nome) {
 
 /* ---------- PAINEL ADMINISTRATIVO ---------- */
 const filtro = { obra: '', status: '', q: '', de: '', ate: '', grupo: 'obra' };
+let analyticsWindowMonths = 12;
 async function sha(s) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
 async function vPainel(view) {
   setTitle('Painel administrativo', ''); setNav('painel');
@@ -551,11 +552,12 @@ async function vPainel(view) {
     $('#pin').onkeydown = e => { if (e.key === 'Enter') $('#go').click(); }; return;
   }
   const [obras, vs, ems, snaps] = await Promise.all([DB.all('obras'), DB.all('vistorias'), DB.all('emissoes'), DB.all('snapshots')]);
-  const sistemaPorTipo = Object.fromEntries(Object.entries(TIPOS_CONST).flatMap(([grupo, tipos]) => tipos.map(tipo => [tipo, grupo])));
-  const grupoPorAmbiente = Object.fromEntries(Object.entries(AMBIENTES).flatMap(([grupo, ambientes]) => ambientes.map(ambiente => [ambiente, grupo])));
+  const taxonomia = typeof Taxonomia !== 'undefined' ? Taxonomia : null;
+  const sistemaPorTipo = Object.fromEntries((taxonomia?.TIPOS || []).map(item => [item.label, item.group]));
+  const grupoPorAmbiente = Object.fromEntries((taxonomia?.AMBIENTES || []).map(item => [item.label, item.group]));
   let resumo = null;
   try {
-    if (typeof Analytics !== 'undefined' && typeof Analytics.resumir === 'function') resumo = await Analytics.resumir({ obras, vistorias: vs, emissoes: ems, snapshots: snaps, snapshotLib: SnapshotLib, sistemaPorTipo, grupoPorAmbiente });
+    if (typeof Analytics !== 'undefined' && typeof Analytics.resumir === 'function') resumo = await Analytics.resumir({ obras, vistorias: vs, emissoes: ems, snapshots: snaps, snapshotLib: SnapshotLib, sistemaPorTipo, grupoPorAmbiente, taxonomia, asOf: hoje(), janelaMeses: analyticsWindowMonths });
   } catch (e) { console.error('Indicadores locais indisponíveis:', e); }
   const listaDimensao = xs => xs.length ? `<ul class="small">${xs.map(x => `<li>${esc(x.label)}: <b>${x.count}</b></li>`).join('')}</ul>` : '<p class="mut small">Sem dados verificáveis nesta dimensão.</p>';
   const om = Object.fromEntries(obras.map(o => [o.id, o]));
@@ -568,8 +570,9 @@ async function vPainel(view) {
   F.forEach(v => { const k = filtro.grupo === 'obra' ? (om[v.obraId]?.nome || '—') : (v.local || 'Sem local'); (grupos[k] ||= []).push(v); });
   const analyticsSection = !resumo ? '<section class="card warnbox"><b>Indicadores locais indisponíveis.</b> A lista de vistorias continua disponível; atualize o aplicativo ou tente novamente.</section>' : `
     <section class="card" aria-labelledby="local-analytics-title"><h2 id="local-analytics-title">Indicadores dos relatórios neste aparelho</h2>
+      <label for="analytics-window">Período da análise</label><select id="analytics-window"><option value="12" ${analyticsWindowMonths === 12 ? 'selected' : ''}>Últimos 12 meses</option><option value="24" ${analyticsWindowMonths === 24 ? 'selected' : ''}>Últimos 24 meses</option><option value="all" ${analyticsWindowMonths === null ? 'selected' : ''}>Todo o histórico</option></select><p class="mut small">Janela: ${esc(resumo.period.label)}. Vistorias sem data válida ficam fora das janelas limitadas. Taxonomia interna do app, não institucional.</p>
       <p class="warnbox">Visão local, não consolidada: os números cobrem somente este navegador e o inventário nele cadastrado. Snapshot verificado indica consistência interna, não autoria nem validação institucional, e não confere os bytes do PDF/DOCX. Os filtros de lista abaixo não alteram estes indicadores.</p>
-      <div class="kpis"><div class="kpi"><span>EDIFÍCIOS COM ÚLTIMO SNAPSHOT VERIFICÁVEL</span><b>${Analytics.formatRatio(resumo.kpis.coverage)}</b><span>Sem janela temporal; inventário local</span></div>
+      <div class="kpis"><div class="kpi"><span>EDIFÍCIOS COM SNAPSHOT VERIFICÁVEL NA JANELA</span><b>${Analytics.formatRatio(resumo.kpis.coverage)}</b><span>Período acima; inventário local cadastrado</span></div>
         <div class="kpi"><span>DENSIDADE ALTA/CRÍTICA</span><b>${Analytics.formatDensity(resumo.kpis.severeDensity)}</b><span>Constatações por vistoria verificável; razão, não percentual</span></div>
         <div class="kpi"><span>FORMALIZAÇÃO LOCAL</span><b>${Analytics.formatRatio(resumo.kpis.formalization)}</b><span>Vistorias com emissão / vistorias cadastradas</span></div>
         <div class="kpi"><span>INTEGRIDADE DO SNAPSHOT</span><b>${Analytics.formatRatio(resumo.kpis.snapshotIntegrity)}</b><span>Vistorias com snapshot verificado / vistorias com emissão</span></div>
@@ -577,7 +580,9 @@ async function vPainel(view) {
         <div class="kpi"><span>GPS DE INÍCIO DISPONÍVEL</span><b>${Analytics.formatRatio(resumo.kpis.gpsAvailability)}</b><span>Indicador descritivo; não compõe nota de qualidade</span></div></div>
       <div class="grid2"><div><h3>Constatações por gravidade</h3>${listaDimensao(resumo.dimensions.severity)}<h3>Constatações por grupo do sistema (catálogo da interface)</h3>${listaDimensao(resumo.dimensions.systemGroup)}</div>
         <div><h3>Constatações por macroambiente (catálogo da interface)</h3>${listaDimensao(resumo.dimensions.environmentGroup)}<h3>Vistorias por mês</h3>${listaDimensao(resumo.dimensions.month)}</div></div>
-      <div class="warnbox"><b>Não calculado:</b> recorrência (não há vínculo estruturado entre achados), saneamento (não há ações corretivas estruturadas) e risco (rubrica de probabilidade/impacto não aprovada). ${resumo.counts.unverifiedLatestEmissions} vistoria(s) com emissão mais recente sem snapshot verificável ou com snapshots empatados divergentes foram excluídas das dimensões. ${resumo.stale.inspectionsEditedAfterEmission} vistoria(s) foram editadas após a emissão considerada; os indicadores refletem o conteúdo congelado na emissão.</div>
+      <div class="grid2"><div><h3>Lacunas cadastrais no inventário local</h3>${resumo.dataGaps.length ? `<ul class="small">${resumo.dataGaps.map(g => `<li>${esc(g.field)}: <b>${g.count}</b> · IDs: ${g.ids.map(id => `<code title="${esc(id)}">${esc(id.length > 15 ? id.slice(0, 8) + '…' + id.slice(-4) : id)}</code>`).join(', ')}${g.truncated ? ' · lista limitada aos 50 primeiros IDs' : ''}</li>`).join('')}</ul>` : '<p class="mut small">Nenhuma lacuna nos campos avaliados.</p>'}</div><div><h3>Candidatos a duplicata</h3>${!resumo.duplicateCandidatesAvailable ? '<p class="mut small">Indisponível neste contexto seguro; os demais indicadores seguem disponíveis.</p>' : resumo.duplicateCandidates.length ? `<p class="mut small">${resumo.duplicateCandidatesTotal} par(es); lista limitada a 200.</p><ul class="small">${resumo.duplicateCandidates.map(d => `<li><code title="${esc(d.vistoriaIdA)}">${esc(d.vistoriaIdA.slice(0, 8))}…</code> ↔ <code title="${esc(d.vistoriaIdB)}">${esc(d.vistoriaIdB.slice(0, 8))}…</code> · aviso, sem mescla</li>`).join('')}</ul>` : '<p class="mut small">Nenhum par candidato nesta janela.</p>'}</div></div>
+      <div class="card"><b>Exportação local restrita</b><p class="mut small">Baixa apenas por ação explícita. O agregado não inclui texto livre, nomes, GPS ou fotos. O manifesto pode incluir IDs somente se a opção abaixo for marcada. Não compartilhe nem centralize sem aprovação de privacidade.</p><label><input type="checkbox" id="analytics-include-ids"> Incluir IDs estáveis no manifesto (desativado por padrão)</label><div class="row wrap"><button class="btn sec sm" id="analytics-export-aggregate">Baixar agregado analítico</button><button class="btn sec sm" id="analytics-export-manifest">Baixar manifesto de migração</button></div></div>
+      <div class="warnbox"><b>Não calculado:</b> recorrência (não há vínculo estruturado entre achados), saneamento (não há ações corretivas estruturadas) e risco (rubrica de probabilidade/impacto não aprovada). ${resumo.counts.periodUnverifiedLatestEmissions} vistoria(s) da janela com emissão mais recente sem snapshot verificável ou com snapshots empatados divergentes foram excluídas das dimensões. ${resumo.stale.inspectionsEditedAfterEmission} vistoria(s) foram editadas após a emissão considerada; os indicadores refletem o conteúdo congelado na emissão.</div>
     </section>`;
   view.innerHTML = `
     <div class="kpis"><div class="kpi"><b>${new Set(F.map(v => v.obraId)).size}</b><span>EDIFÍCIOS</span></div><div class="kpi"><b>${F.length}</b><span>VISTORIAS</span></div><div class="kpi"><b>${F.filter(v => v.status === 'emitido').length}</b><span>EMITIDAS</span></div><div class="kpi"><b>${F.filter(v => v.status !== 'emitido').length}</b><span>EM RASCUNHO</span></div><div class="kpi"><b>${nFotos}</b><span>FOTOS</span></div><div class="kpi"><b>${E.length}</b><span>LINHAS DE EMISSÃO</span></div></div>
@@ -590,6 +595,22 @@ ${analyticsSection}    <div class="card"><div class="grid2"><div><label style="m
     <div class="row sp"><h2>Registro de emissões</h2><button class="btn sec sm" id="csv">Exportar CSV</button></div>
     <div class="tw"><table><tr><th>Data/hora</th><th>Documento</th><th>Rev.</th><th>Tipo</th><th>Fmt</th><th>Edifício · Local</th><th>Emitido por</th></tr>${E.slice(0, 80).map(e => `<tr><td>${esc(Rep.fTs(e.data))}</td><td>${esc(e.numero)}</td><td>${esc(pad(e.rev))}</td><td>${esc(tipoNome(e.tipo, true))}</td><td>${esc(String(e.formato||'').toUpperCase())}</td><td>${esc((om[e.obraId]?.nome || '') + ' · ' + (vm[e.vistoriaId]?.local || ''))}</td><td>${esc(e.usuario || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="mut">Sem emissões.</td></tr>'}</table></div>`;
   bindGo(view);
+  const periodSelect = view.querySelector('#analytics-window');
+  if (periodSelect) periodSelect.onchange = () => { analyticsWindowMonths = periodSelect.value === 'all' ? null : Number(periodSelect.value); route(); };
+  const downloadAnalytics = async manifest => {
+    if (typeof AnalyticsExport === 'undefined') return toast('Exportador analítico indisponível. Atualize o aplicativo.');
+    const includeIds = manifest && Boolean(view.querySelector('#analytics-include-ids')?.checked);
+    const warning = `Este arquivo contém indicadores locais de classe restrita${includeIds ? ' e IDs que permitem vincular o manifesto a registros deste aparelho' : ''}. Ele não contém texto livre, fotos ou GPS. Não compartilhe nem centralize sem autorização de privacidade. Continuar?`;
+    if (!await confirmar(warning)) return;
+    try {
+      const options = { SnapshotLib, incluirIds: includeIds };
+      const result = manifest ? await AnalyticsExport.gerarManifesto(resumo, options) : await AnalyticsExport.gerarAgregado(resumo, options);
+      const name = manifest ? 'manifesto-migracao-local.json' : 'indicadores-analiticos-locais.json';
+      baixar(new Blob([result.json], { type: 'application/json' }), name);
+    } catch (error) { console.error(error); toast('Não foi possível preparar a exportação analítica.'); }
+  };
+  const aggregateButton = view.querySelector('#analytics-export-aggregate'); if (aggregateButton) aggregateButton.onclick = () => downloadAnalytics(false);
+  const manifestButton = view.querySelector('#analytics-export-manifest'); if (manifestButton) manifestButton.onclick = () => downloadAnalytics(true);
   view.querySelectorAll('[data-f]').forEach(el => el.onchange = () => { filtro[el.dataset.f] = el.value; route(); });
   view.querySelectorAll('[data-f="q"]').forEach(el => { el.onchange = null; el.onkeydown = e => { if (e.key === 'Enter') { filtro.q = el.value; route(); } }; el.onblur = () => { if (filtro.q !== el.value) { filtro.q = el.value; route(); } }; });
   view.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { filtro.grupo = b.dataset.g; route(); });

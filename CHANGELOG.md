@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 1.2.0 · 30/10/2026
+
+- Painel analítico local com janela de 12/24 meses ou histórico completo, período explícito e denominadores consistentes com a data congelada em cada snapshot verificável.
+- Taxonomia interna versionada por códigos para os 46 tipos e 34 ambientes atuais; não é institucional e não altera os registros emitidos.
+- Painel sinaliza candidatos a duplicata sem mesclar dados e lacunas cadastrais locais.
+- Exportações minimizadas e determinísticas do agregado e manifesto, com hash SHA-256 canônico; IDs permanecem desativados por padrão e exigem ação explícita.
+- Nenhuma API, sincronização, risco calculado ou consolidação multiunidade foi adicionada. A taxonomia e os indicadores são locais; os arquivos de exportação têm classe restrita.
+
 ## 1.1.0 · 30/10/2026
 
 - Emissões passam a preservar snapshots e arquivos PDF/DOCX com verificação de integridade local; numeração por vistoria é reservada atomicamente no aparelho.

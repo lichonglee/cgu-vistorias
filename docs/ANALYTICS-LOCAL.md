@@ -1,16 +1,18 @@
 # Indicadores locais do CGU Vistorias
 
-## Escopo e seleção
+## Escopo, período e seleção
 
 `analytics.js` calcula agregações locais para conferência de registros guardados neste aparelho. Não é uma visão da carteira institucional da CGU, não sincroniza dados e não deve embasar comparação entre unidades.
 
 A seleção é uma heurística local: para cada vistoria, prioriza o maior número de revisão; em empate, usa a data/hora gravada no aparelho. Todos os candidatos empatados em revisão e data precisam ter snapshot verificável e projeção analítica idêntica; caso contrário, a vistoria é excluída e indicada como lacuna ambígua/divergente. A regra compara revisão mesmo entre tipos de relatório; como a aplicação ainda não define uma cronologia analítica comum entre tipos, esta é uma limitação conhecida. Revisões podem ser específicas por tipo, relógios podem estar incorretos e backups podem vir de aparelhos diferentes. Portanto, “selecionado” não prova que seja a versão cronologicamente mais recente no mundo real. A seleção não retorna silenciosamente a uma revisão menor quando a selecionada falha.
 
+A análise permite 12 meses, 24 meses ou todo o histórico até uma data `asOf`. Nas janelas limitadas, filtra pela data válida da vistoria representada pelo snapshot, com início no primeiro dia do mês inicial e fim inclusivo; datas ausentes/inválidas são contadas e excluídas. Todo o histórico inclui datas ausentes, exibidas como “Data ausente”. A cobertura da janela é edifícios do inventário local atual com snapshot selecionado verificável no período / todos os edifícios cadastrados localmente; o denominador não é temporal.
+
 O selo local “verificado” significa consistência interna do snapshot no IndexedDB, não autoria, validação institucional ou conferência dos bytes do PDF/DOCX emitido. Os artefatos têm verificação separada no histórico de emissões.
 
 ## Indicadores e denominadores
 
-- **Cobertura histórica local:** edifícios do inventário local atual vinculados a uma vistoria cujo snapshot selecionado é verificável / edifícios cadastrados neste aparelho. Não há janela temporal nem distinção de edifícios ativos.
+- **Cobertura local na janela:** edifícios do inventário local atual com snapshot selecionado verificável na janela / edifícios cadastrados neste aparelho. O denominador não é temporal e não distingue edifícios ativos.
 - **Densidade de altas/críticas:** constatações Alta ou Crítica / vistorias com snapshot selecionado verificável. É uma razão (pode superar 1), não uma porcentagem.
 - **Formalização local:** vistorias cadastradas com ao menos uma linha de emissão / total de vistorias cadastradas. Cada vistoria conta uma vez; `emissionRows` é quantidade de linhas de emissão, não de relatórios únicos.
 - **Integridade de snapshot:** vistorias com emissão cujo snapshot selecionado foi verificado localmente / vistorias cadastradas com emissão.
@@ -18,7 +20,9 @@ O selo local “verificado” significa consistência interna do snapshot no Ind
 - **Disponibilidade de GPS:** snapshots selecionados verificáveis com coordenadas iniciais válidas / snapshots selecionados verificáveis. É descritivo, não uma nota de qualidade.
 - **Edição posterior:** quantidade de vistorias cujo `updatedAt` local é posterior à emissão selecionada / snapshots selecionados verificáveis.
 
-A dimensão mensal conta vistorias. Gravidade, sistema e macroambiente contam constatações. Gravidade inválida ou ausente vai para “Sem classificação”. Sistema e ambiente são agrupamentos derivados das opções textuais da interface, não códigos de taxonomia institucional; valores não mapeados recebem rótulos fixos e não são reproduzidos no painel.
+A dimensão mensal conta vistorias. Gravidade, sistema e macroambiente contam constatações. Gravidade inválida ou ausente vai para “Sem classificação”. `taxonomia.js` atribui códigos internos estáveis por correspondência exata aos textos atuais, sem gravá-los no banco ou nos snapshots; não são códigos de taxonomia institucional. Valores não mapeados recebem rótulos fixos e não são reproduzidos no painel. A tela também exibe candidatos a duplicata (apenas aviso por edifício/data/hash de conteúdo, sem mescla) e lacunas cadastrais com IDs locais.
+
+As exportações `cgu-local-analytics-v1` e `cgu-migration-manifest-v1` exigem clique e confirmação. O agregado usa allowlist de campos e dimensões. O manifesto omite IDs por padrão; incluí-los exige marcar explicitamente a opção. Ambos recebem hash SHA-256 da serialização canônica, não assinatura/autoria. Arquivos são de classe restrita e não devem ser compartilhados ou centralizados sem aprovação de privacidade; não há limiar k aprovado.
 
 Recorrência, saneamento de apontamentos e pontuação/ordenação de risco não são calculados: faltam vínculos estruturados e rubrica aprovada de probabilidade e impacto. A gravidade isolada não é tratada como risco.
 
