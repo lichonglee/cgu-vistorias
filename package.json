@@ -1,6 +1,6 @@
 {
   "name": "cgu-vistorias",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "description": "Verificação da distribuição estática e dos módulos locais do CGU Vistorias",
   "engines": { "node": ">=24" },

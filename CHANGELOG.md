@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 1.7.0 · 30/10/2026
+
+- Histórico de emissões permite comparar duas emissões verificadas da mesma vistoria com snapshots congelados. Constatações são relacionadas por ID; evidências são comparadas por SHA-256, sem depender dos IDs locais das fotos.
+- Snapshots legados, ausentes ou divergentes e vínculos de edifício/vistoria diferentes tornam a comparação indisponível, sem resultado parcial. O resultado reconcilia os totais dos dois lados e é somente de leitura.
+- Verificado significa consistência local do snapshot; não prova autoria nem valida os bytes do PDF/DOCX. Os detalhes podem conter dados técnicos restritos; não projetar em tela pública.
+- Sem mudança no IndexedDB v3, esquema de snapshot, backup, rede ou dados persistidos. A versão PWA 1.7.0 cria um cache novo. QA visual em navegador/dispositivo e gates institucionais permanecem pendentes; esta candidata não está aprovada para publicação.
+
 ## 1.6.0 · 30/10/2026
 
 - Painel local acrescenta fila paginada de acompanhamento, filtrável por ação vencida, aberta há mais de 30 dias e constatação Alta/Crítica sem ação declarada; cada item navega até a constatação.

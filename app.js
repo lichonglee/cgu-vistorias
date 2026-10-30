@@ -566,7 +566,15 @@ async function vEmitir(tb, v, o, fotos) {
       <div class="row" style="margin-top:10px"><button class="btn grow" data-e="fotografico:docx">Word (.docx)</button><button class="btn grow" data-e="fotografico:pdf">PDF</button></div></div>
     <div class="card" style="border-color:var(--a)"><b>Relatório Consolidado</b> ${last('consolidado') ? `<span class="chip">Rev. ${pad(last('consolidado').rev)}</span>` : ''}<div class="mut small">Vistoria técnica e registro fotográfico em um único documento, com uma só capa e um só cabeçalho (numeração RC).</div>
       <div class="row" style="margin-top:10px"><button class="btn grow" data-e="consolidado:docx">Word (.docx)</button><button class="btn grow" data-e="consolidado:pdf">PDF</button></div></div>
-    <h3>Histórico de emissões</h3>${ems.map(e => `<div class="card small"><b>${esc(e.numero)} · Rev. ${esc(pad(e.rev))}</b> <span class="chip mut">${esc(String(e.formato||'').toUpperCase())}</span><div class="mut">${esc(tipoNome(e.tipo))} · ${esc(Rep.fTs(e.data))}${e.usuario ? ' · ' + esc(e.usuario) : ''}</div><div class="mut small">${esc(SN_TXT[snEst[e.id].estado]||'Estado indisponível')}${e.snapshotHash ? ' · ' + esc(e.snapshotHash.slice(0, 12)) : ''}</div>${arEst[e.id] ? `<div class="mut small">Arquivo original: ${esc(AR_TXT[arEst[e.id].estado]||'Estado indisponível')}</div>${arEst[e.id].estado === 'verificado' ? `<button class="btn ghost" data-arq="${esc(e.id)}">Baixar original verificado</button>` : ''}` : ''}</div>`).join('') || '<div class="mut small">Nenhuma emissão registrada.</div>'}`;
+    <h3>Histórico de emissões</h3>${ems.map(e => `<div class="card small" data-emission-card="${esc(e.id)}"><b>${esc(e.numero)} · Rev. ${esc(pad(e.rev))}</b> <span class="chip mut">${esc(String(e.formato||'').toUpperCase())}</span><div class="mut">${esc(tipoNome(e.tipo))} · ${esc(Rep.fTs(e.data))}${e.usuario ? ' · ' + esc(e.usuario) : ''}</div><div class="mut small">${esc(SN_TXT[snEst[e.id].estado]||'Estado indisponível')}${e.snapshotHash ? ' · ' + esc(e.snapshotHash.slice(0, 12)) : ''}</div>${arEst[e.id] ? `<div class="mut small">Arquivo original: ${esc(AR_TXT[arEst[e.id].estado]||'Estado indisponível')}</div>${arEst[e.id].estado === 'verificado' ? `<button class="btn ghost" data-arq="${esc(e.id)}">Baixar original verificado</button>` : ''}` : ''}</div>`).join('') || '<div class="mut small">Nenhuma emissão registrada.</div>'}`;
+  for (const e of ems) {
+    if (snEst[e.id]?.estado !== 'verificado' || !ems.some(other => other.id !== e.id && snEst[other.id]?.estado === 'verificado')) continue;
+    const card = [...tb.querySelectorAll('[data-emission-card]')].find(item => item.dataset.emissionCard === e.id);
+    if (!card) continue;
+    const compareButton = document.createElement('button'); compareButton.className = 'btn sec sm';
+    compareButton.textContent = 'Comparar com outra emissão'; compareButton.setAttribute('aria-label', `Comparar emissão ${e.numero}, revisão ${e.rev}`);
+    compareButton.onclick = () => abrirComparacaoEmissoes(e.id, ems, sns, snEst); card.appendChild(compareButton);
+  }
   tb.querySelectorAll('[data-arq]').forEach(b => b.onclick = async () => {
     const e = ems.find(x => x.id === b.dataset.arq); const a = (await DB.all('arquivosEmitidos')).find(x => x.emissaoId === e.id);
     const r = await SnapshotLib.verificarArquivo(e, sns.find(s => s.id === e.snapshotId), a);
@@ -580,6 +588,56 @@ async function vEmitir(tb, v, o, fotos) {
     b.disabled = false; b.textContent = txt;
   });
 }
+function abrirComparacaoEmissoes(leftId, ems, snapshots, states) {
+  const opener = document.activeElement;
+  const left = ems.find(e => e.id === leftId), eligible = ems.filter(e => e.id !== leftId && states[e.id]?.estado === 'verificado')
+    .sort((a,b) => Number(a.data||0)-Number(b.data||0) || Number(a.rev||0)-Number(b.rev||0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  if (!left || states[leftId]?.estado !== 'verificado' || !eligible.length) return toast('São necessárias duas emissões com snapshots verificados desta vistoria.');
+  const el = modal(`<h2 id="compare-heading">Comparar emissões</h2><p class="warnbox">Declarações locais baseadas em snapshots congelados. “Verificado” significa consistência local (SHA-256), não autoria. Os detalhes podem conter dados técnicos restritos; não projete em tela pública.</p><p><b>Referência (A):</b> ${esc(left.numero)} · Rev. ${esc(pad(left.rev))} · ${esc(tipoNome(left.tipo))} · verificada neste aparelho</p><label for="compare-right">Comparação (B)</label><select id="compare-right">${eligible.map(e => `<option value="${esc(e.id)}">${esc(e.numero)} · Rev. ${esc(pad(e.rev))} · ${esc(tipoNome(e.tipo))} · ${esc(String(e.formato||'').toUpperCase())} · verificada neste aparelho</option>`).join('')}</select><p class="mut small">A leitura segue a direção A → B, conforme a referência escolhida; a lista B é ordenada por data e revisão.</p><button class="btn block" id="run-compare">Comparar snapshots</button><div id="compare-result" aria-live="polite"></div><button class="btn ghost block" id="close-compare">Fechar</button>`, () => opener?.focus());
+  el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-labelledby', 'compare-heading');
+  const heading = el.querySelector('#compare-heading'); heading.tabIndex = -1; heading.focus();
+  el.querySelector('#close-compare').onclick = closeModal;
+  el.querySelector('#run-compare').onclick = async () => {
+    const right = eligible.find(e => e.id === el.querySelector('#compare-right').value);
+    const target = el.querySelector('#compare-result');
+    if (typeof SnapshotDiff === 'undefined') { target.innerHTML = '<p class="warnbox">Comparação indisponível neste cache do aplicativo.</p>'; return; }
+    const result = await SnapshotDiff.compareEmissions(left, right, snapshots, SnapshotLib.verificarEmissao);
+    if (!result.available || !result.totals.leftReconciles || !result.totals.rightReconciles) { target.innerHTML = `<p class="warnbox">Comparação indisponível: ${esc(result.reason || 'resultado inconsistente')}.</p>`; return; }
+    const fieldName = key => ({ titulo: 'Título', tipo: 'Tipo', gravidade: 'Gravidade', ambiente: 'Ambiente', local: 'Local', descricao: 'Descrição', recomendacao: 'Recomendação' }[key] || key);
+    const showValue = value => value === undefined ? '—' : typeof value === 'string' ? value : JSON.stringify(value);
+    const batchSize = 100;
+    const card = (entry, kind, index) => {
+      const row = kind === 'removed' ? entry.before : entry.after;
+      const title = `${kind === 'added' ? 'Acrescentada' : kind === 'removed' ? 'Removida' : kind === 'changed' ? 'Alterada' : 'Sem alteração'} · ${esc(row.titulo || 'Constatação sem título')}`;
+      if (kind === 'unchanged') return `<details class="compare-finding" data-unchanged-index="${index}"><summary>${title}</summary><p class="small mut">ID local: ${esc(entry.id)}</p><div data-unchanged-fields></div></details>`;
+      const fields = kind === 'changed' ? entry.fields : Object.keys(row).filter(k => k !== 'fotoIds' && k !== 'id').sort();
+      return `<article class="compare-finding"><h4>${title}</h4><p class="small mut">ID local: ${esc(entry.id)}</p>${fields.map(key => `<div class="compare-field"><b>${esc(fieldName(key))}</b><span>${kind === 'changed' ? `${esc(showValue(entry.before[key]))} → ${esc(showValue(entry.after[key]))}` : esc(showValue(kind === 'removed' ? entry.before[key] : entry.after[key]))}</span></div>`).join('') || '<p class="small mut">Nenhuma alteração nos campos da constatação.</p>'}</article>`;
+    };
+    const sections = [['Acrescentadas', result.added, 'added'], ['Removidas', result.removed, 'removed'], ['Alteradas', result.changed, 'changed'], ['Sem alteração', result.unchanged, 'unchanged']];
+    const evidenceList = list => list.length ? list.map(x => `<li>${x.count} evidência(s) · SHA-256 ${esc(x.sha256.slice(0, 12))}…</li>`).join('') : '<li>Nenhuma</li>';
+    const evidenceCount = list => list.reduce((n, x) => n + x.count, 0);
+    const sectionHtml = ([title, rows, kind]) => `<details ${rows.length && kind !== 'unchanged' ? 'open' : ''}><summary>${title} (${rows.length})</summary><div data-diff-list="${kind}" data-shown="${Math.min(rows.length,batchSize)}">${rows.slice(0,batchSize).map((row,index) => card(row,kind,index)).join('') || '<p class="mut small">Nenhuma.</p>'}</div>${rows.length>batchSize?`<button class="btn ghost sm" data-diff-more="${kind}">Mostrar mais ${batchSize}</button>`:''}</details>`;
+    target.innerHTML = `<p class="okbox">${result.added.length} acrescentada(s), ${result.removed.length} removida(s), ${result.changed.length} alterada(s), ${result.unchanged.length} igual(is). Reconciliação: ${result.totals.left} constatações na referência; ${result.totals.right} na comparação.</p><p class="mut small">Alterações nas associações locais de fotos (fotoIds) não mudam a classificação da constatação; as evidências são comparadas separadamente pelo SHA-256 do conteúdo.</p><h3>Evidências por SHA-256</h3><p class="small">Iguais: ${evidenceCount(result.evidence.unchanged)} · novas: ${evidenceCount(result.evidence.added)} · removidas: ${evidenceCount(result.evidence.removed)}</p><details><summary>Hashes abreviados</summary><p>Iguais</p><ul>${evidenceList(result.evidence.unchanged)}</ul><p>Novas</p><ul>${evidenceList(result.evidence.added)}</ul><p>Removidas</p><ul>${evidenceList(result.evidence.removed)}</ul></details>${sections.map(sectionHtml).join('')}<p class="mut small">Comparação local e somente de leitura. Integridade do snapshot não prova autoria nem valida os bytes do PDF/DOCX.</p>`;
+    const bindUnchanged = (list, rows) => list.querySelectorAll('[data-unchanged-index]').forEach(detail => { if (detail.dataset.bound) return; detail.dataset.bound = '1'; detail.addEventListener('toggle', () => {
+      if (!detail.open || detail.dataset.ready) return;
+      const row = rows[Number(detail.dataset.unchangedIndex)]; if (!row) return;
+      const fields = Object.keys(row.after).filter(k => k !== 'fotoIds' && k !== 'id').sort();
+      detail.querySelector('[data-unchanged-fields]').innerHTML = fields.map(key => `<div class="compare-field"><b>${esc(fieldName(key))}</b><span>${esc(showValue(row.after[key]))}</span></div>`).join('') || '<p class="mut small">Nenhum campo adicional.</p>';
+      detail.dataset.ready = '1';
+    }); });
+    for (const [title, rows, kind] of sections) {
+      const list = target.querySelector(`[data-diff-list="${kind}"]`); bindUnchanged(list, rows);
+      const more = target.querySelector(`[data-diff-more="${kind}"]`);
+      if (more) more.onclick = () => {
+        const startAt = Number(list.dataset.shown), endAt = Math.min(startAt + batchSize, rows.length);
+        list.insertAdjacentHTML('beforeend', rows.slice(startAt,endAt).map((row,index) => card(row,kind,startAt+index)).join(''));
+        list.dataset.shown = String(endAt); if (endAt >= rows.length) more.hidden = true;
+        bindUnchanged(list, rows);
+      };
+    }
+  };
+}
+
 async function emitir(vid, tipo, fmt, oficial, novaRev) {
   const v = await DB.get('vistorias', vid), o = await DB.get('obras', v.obraId);
   const fotos = (await DB.by('fotos', 'vistoriaId', vid)).sort(byTs);
