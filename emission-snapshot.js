@@ -11,6 +11,9 @@
   const MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024;   // teto por snapshot (UTF-8 do JSON canônico de conteudo)
   const MAX_DEPTH = 32;
   const HEX64 = /^[0-9a-f]{64}$/;
+  const ID_LEGADO = /^[A-Za-z0-9_-]{8,64}$/;   // ids de vistoria/edifício gerados pelo fallback antigo de DB.uid (não UUID)
+  const MIMES = { pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+  const MAX_ARQUIVO_BYTES = 50 * 1024 * 1024;
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const BINARY_KEYS = new Set(['blob', 'base', 'bytes', 'cropBackup']);
 
@@ -58,6 +61,17 @@
     return sha256(bytes);
   }
 
+  /* O hash do snapshot autentica o envelope inteiro (identidade, vínculos, formato, número, criadoEm) e o conteúdo.
+     Só o próprio campo hash fica de fora. appVersion do envelope é espelho de conteudo.app.versao. */
+  const ENV_KEYS = ['schema', 'schemaVersion', 'canonicalizacao', 'hashAlgoritmo', 'id', 'emissaoId', 'vistoriaId', 'obraId', 'tipo', 'formato', 'numero', 'rev', 'criadoEm', 'appVersion'];
+  async function hashSnapshot(s) {
+    const m = {}; for (const k of ENV_KEYS) m[k] = s[k];
+    m.conteudo = s.conteudo;
+    const bytes = enc(canonicalize(m));
+    if (bytes.length > MAX_SNAPSHOT_BYTES + 4096) throw new Error('snapshot excede o limite de ' + MAX_SNAPSHOT_BYTES + ' bytes');
+    return sha256(bytes);
+  }
+
   async function hashBlob(blob) { return sha256(await blob.arrayBuffer()); }
 
   /* Monta o conteúdo emitido. Entradas já carregadas do IndexedDB; nada é lido depois (sem corrida com edição).
@@ -87,14 +101,16 @@
 
   /* Cria o envelope. `uid` é injetado (DB.uid). O hash cobre somente `conteudo`. */
   async function criar({ id, emissaoId, formato, conteudo, criadoEm, appVersion }) {
-    const hash = await hashConteudo(conteudo);
-    return {
-      id, schema: SCHEMA, schemaVersion: SCHEMA_VERSION, canonicalizacao: C14N, hashAlgoritmo: ALGO, hash,
+    await hashConteudo(conteudo);   // aplica o limite de tamanho
+    const s = {
+      id, schema: SCHEMA, schemaVersion: SCHEMA_VERSION, canonicalizacao: C14N, hashAlgoritmo: ALGO,
       criadoEm: criadoEm || Date.now(), appVersion: appVersion || null,
       emissaoId, vistoriaId: conteudo.vistoria.id, obraId: conteudo.obra.id,
       tipo: conteudo.emissao.tipo, formato, numero: conteudo.emissao.numero, rev: conteudo.emissao.rev,
       conteudo
     };
+    s.hash = await hashSnapshot(s);
+    return s;
   }
 
   /* Validação estrutural + recálculo do hash. Retorna {ok, erros[]}; nunca lança. Reutilizável na importação. */
@@ -106,7 +122,8 @@
       if (s.schemaVersion !== SCHEMA_VERSION) erros.push('schemaVersion não suportada');
       if (s.canonicalizacao !== C14N) erros.push('canonicalização desconhecida');
       if (s.hashAlgoritmo !== ALGO) erros.push('algoritmo desconhecido');
-      for (const k of ['id', 'emissaoId', 'vistoriaId', 'obraId']) if (typeof s[k] !== 'string' || !UUID.test(s[k])) erros.push(k + ' não é UUID');
+      for (const k of ['id', 'emissaoId']) if (typeof s[k] !== 'string' || !UUID.test(s[k])) erros.push(k + ' não é UUID');
+      for (const k of ['vistoriaId', 'obraId']) if (typeof s[k] !== 'string' || !(UUID.test(s[k]) || ID_LEGADO.test(s[k]))) erros.push(k + ' inválido');
       if (typeof s.hash !== 'string' || !HEX64.test(s.hash)) erros.push('hash inválido');
       if (!['tecnico', 'fotografico', 'consolidado'].includes(s.tipo)) erros.push('tipo inválido');
       if (!['docx', 'pdf'].includes(s.formato)) erros.push('formato inválido');
@@ -118,14 +135,61 @@
         if (!c.obra || c.obra.id !== s.obraId) erros.push('obraId diverge do conteúdo');
         if (!c.emissao || c.emissao.tipo !== s.tipo || c.emissao.rev !== s.rev) erros.push('tipo/rev divergem do conteúdo');
         if (!Array.isArray(c.constatacoes) || !Array.isArray(c.evidencias)) erros.push('constatacoes/evidencias ausentes');
-        else if (c.evidencias.some(e => !e || !HEX64.test(e.sha256 || ''))) erros.push('evidência sem sha256');
+        else {
+          if (c.evidencias.some(e => !e || !HEX64.test(e.sha256 || ''))) erros.push('evidência sem sha256');
+          const ids = c.evidencias.map(e => e && e.id);
+          if (new Set(ids).size !== ids.length) erros.push('evidências com id repetido');
+          if (c.evidencias.some(e => e && e.vistoriaId !== s.vistoriaId)) erros.push('evidência de outra vistoria');
+          const refs = c.constatacoes.flatMap(k => Array.isArray(k && k.fotoIds) ? k.fotoIds : []);
+          if (refs.some(r => !ids.includes(r))) erros.push('constatação referencia foto fora das evidências');
+        }
+        if (c.vistoria && c.vistoria.obraId !== s.obraId) erros.push('vistoria.obraId diverge');
+        if (c.emissao && S2(c.emissao.numero) !== S2(s.numero)) erros.push('numero do envelope diverge do conteúdo');
+        if (!c.emissao || !c.emissao.numero || c.vistoria.seq !== c.emissao.numero.seq || c.vistoria.ano !== c.emissao.numero.ano) erros.push('seq/ano da vistoria divergem de emissao.numero');
+        if (!c.app || c.app.versao !== s.appVersion) erros.push('appVersion diverge do conteúdo');
       }
       if (!erros.length) {
-        const h = await hashConteudo(s.conteudo);
+        const h = await hashSnapshot(s);
         if (h !== s.hash) erros.push('hash não confere com o conteúdo');
       }
     } catch (e) { erros.push(String(e.message || e)); }
     return { ok: !erros.length, erros };
+  }
+
+  const S2 = v => canonicalize(v === undefined ? null : v);
+
+  /* ---------- artefato emitido (PDF/DOCX exato) ---------- */
+  const startsWith = async (blob, bytes) => { const b = new Uint8Array(await blob.slice(0, bytes.length).arrayBuffer()); return bytes.every((x, i) => b[i] === x); };
+  const MAGIC = { pdf: [0x25, 0x50, 0x44, 0x46, 0x2d], docx: [0x50, 0x4b, 0x03, 0x04] };
+
+  async function criarArquivo({ id, snapshot, arquivo, blob }) {
+    if (blob.size > MAX_ARQUIVO_BYTES) throw new Error('arquivo excede o limite de ' + MAX_ARQUIVO_BYTES + ' bytes');
+    return { id, emissaoId: snapshot.emissaoId, snapshotId: snapshot.id, arquivo, mime: MIMES[snapshot.formato], blob, sha256: await hashBlob(blob), bytes: blob.size };
+  }
+
+  /* Estados: 'ausente' (sem registro), 'divergente', 'verificado'. Compara com snapshot e emissão informados. */
+  async function verificarArquivo(emissao, snapshot, arq) {
+    if (!arq) return { estado: 'ausente', detalhe: 'Arquivo emitido não está preservado neste aparelho.' };
+    const erros = [];
+    try {
+      if (typeof arq.id !== 'string' || !UUID.test(arq.id)) erros.push('id inválido');
+      if (!snapshot) erros.push('sem snapshot');
+      else {
+        if (arq.snapshotId !== snapshot.id) erros.push('snapshotId diverge');
+        if (arq.emissaoId !== snapshot.emissaoId || arq.emissaoId !== emissao.id) erros.push('emissaoId diverge');
+        if (arq.mime !== MIMES[snapshot.formato]) erros.push('mime diverge do formato');
+        if (!(await startsWith(arq.blob, MAGIC[snapshot.formato] || [0]))) erros.push('assinatura do arquivo não corresponde ao formato');
+      }
+      if (!(arq.blob instanceof Blob)) erros.push('blob ausente');
+      else {
+        if (arq.bytes !== arq.blob.size) erros.push('tamanho diverge');
+        if (arq.blob.size > MAX_ARQUIVO_BYTES) erros.push('acima do limite');
+        if (!HEX64.test(arq.sha256 || '')) erros.push('sha256 inválido');
+        else if (arq.sha256 !== emissao.arquivoSha256) erros.push('sha256 difere do registrado na emissão');
+        else if (await hashBlob(arq.blob) !== arq.sha256) erros.push('conteúdo não confere com sha256');
+      }
+    } catch (e) { erros.push(String(e.message || e)); }
+    return erros.length ? { estado: 'divergente', detalhe: erros.join('; ') } : { estado: 'verificado', detalhe: 'SHA-256 do arquivo confere.' };
   }
 
   /* Estado de uma emissão perante seu snapshot:
@@ -146,5 +210,5 @@
     return existente.hash === recebido.hash ? 'duplicata' : 'conflito';
   }
 
-  return { SCHEMA, SCHEMA_VERSION, C14N, ALGO, MAX_SNAPSHOT_BYTES, canonicalize, hashConteudo, hashBlob, sha256, capturar, criar, validar, verificarEmissao, compararExistente };
+  return { SCHEMA, SCHEMA_VERSION, C14N, ALGO, MAX_SNAPSHOT_BYTES, canonicalize, hashConteudo, hashSnapshot, hashBlob, criarArquivo, verificarArquivo, MIMES, MAX_ARQUIVO_BYTES, sha256, capturar, criar, validar, verificarEmissao, compararExistente };
 });

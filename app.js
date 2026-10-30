@@ -464,7 +464,10 @@ async function vEmitir(tb, v, o, fotos) {
   const ems = (await DB.by('emissoes', 'vistoriaId', v.id)).sort((a, b) => b.data - a.data);
   const sns = await DB.by('snapshots', 'vistoriaId', v.id), snEst = {};
   for (const e of ems) snEst[e.id] = await SnapshotLib.verificarEmissao(e, sns.find(s => s.id === e.snapshotId));
-  const SN_TXT = { verificado: '✓ Conteúdo verificado (SHA-256)', legado: 'Sem snapshot verificável (emissão anterior)', ausente: '⚠ Snapshot ausente neste aparelho', divergente: '⚠ Snapshot divergente' };
+  const ars = await DB.all('arquivosEmitidos'), arEst = {};
+  for (const e of ems) arEst[e.id] = e.snapshotId ? await SnapshotLib.verificarArquivo(e, sns.find(s => s.id === e.snapshotId), ars.find(a => a.emissaoId === e.id)) : null;
+  const AR_TXT = { verificado: '✓ preservado, SHA-256 confere', ausente: '⚠ ausente neste aparelho (não verificado)', divergente: '⚠ divergente' };
+  const SN_TXT = { verificado: '✓ Integridade confere (SHA-256); não indica autoria', legado: 'Sem snapshot verificável (emissão anterior)', ausente: '⚠ Snapshot ausente neste aparelho', divergente: '⚠ Snapshot divergente' };
   const semDesc = fotos.filter(f => !f.descricao).length;
   const chk = [];
   if (!v.local) chk.push('Informe o local visitado'); if (!fotos.length) chk.push('Nenhuma foto registrada');
@@ -482,7 +485,13 @@ async function vEmitir(tb, v, o, fotos) {
       <div class="row" style="margin-top:10px"><button class="btn grow" data-e="fotografico:docx">Word (.docx)</button><button class="btn grow" data-e="fotografico:pdf">PDF</button></div></div>
     <div class="card" style="border-color:var(--a)"><b>Relatório Consolidado</b> ${last('consolidado') ? `<span class="chip">Rev. ${pad(last('consolidado').rev)}</span>` : ''}<div class="mut small">Vistoria técnica e registro fotográfico em um único documento, com uma só capa e um só cabeçalho (numeração RC).</div>
       <div class="row" style="margin-top:10px"><button class="btn grow" data-e="consolidado:docx">Word (.docx)</button><button class="btn grow" data-e="consolidado:pdf">PDF</button></div></div>
-    <h3>Histórico de emissões</h3>${ems.map(e => `<div class="card small"><b>${esc(e.numero)} · Rev. ${pad(e.rev)}</b> <span class="chip mut">${e.formato.toUpperCase()}</span><div class="mut">${tipoNome(e.tipo)} · ${Rep.fTs(e.data)}${e.usuario ? ' · ' + esc(e.usuario) : ''}</div><div class="mut small">${SN_TXT[snEst[e.id].estado]}${e.snapshotHash ? ' · ' + e.snapshotHash.slice(0, 12) : ''}</div></div>`).join('') || '<div class="mut small">Nenhuma emissão registrada.</div>'}`;
+    <h3>Histórico de emissões</h3>${ems.map(e => `<div class="card small"><b>${esc(e.numero)} · Rev. ${pad(e.rev)}</b> <span class="chip mut">${e.formato.toUpperCase()}</span><div class="mut">${tipoNome(e.tipo)} · ${Rep.fTs(e.data)}${e.usuario ? ' · ' + esc(e.usuario) : ''}</div><div class="mut small">${SN_TXT[snEst[e.id].estado]}${e.snapshotHash ? ' · ' + e.snapshotHash.slice(0, 12) : ''}</div>${arEst[e.id] ? `<div class="mut small">Arquivo original: ${AR_TXT[arEst[e.id].estado]}</div>${arEst[e.id].estado === 'verificado' ? `<button class="btn ghost" data-arq="${e.id}">Baixar original verificado</button>` : ''}` : ''}</div>`).join('') || '<div class="mut small">Nenhuma emissão registrada.</div>'}`;
+  tb.querySelectorAll('[data-arq]').forEach(b => b.onclick = async () => {
+    const e = ems.find(x => x.id === b.dataset.arq); const a = (await DB.all('arquivosEmitidos')).find(x => x.emissaoId === e.id);
+    const r = await SnapshotLib.verificarArquivo(e, sns.find(s => s.id === e.snapshotId), a);
+    if (r.estado !== 'verificado') return toast('Arquivo não verificado: ' + r.detalhe, 5000);
+    baixar(a.blob, a.arquivo);
+  });
   const nrev = $('#nrev'); if (nrev) nrev.checked = autoRev('tecnico') || autoRev('fotografico') || autoRev('consolidado');
   tb.querySelectorAll('[data-e]').forEach(b => b.onclick = async () => {
     const [tipo, fmt] = b.dataset.e.split(':'); b.disabled = true; const txt = b.textContent; b.textContent = 'Gerando…';
@@ -501,19 +510,22 @@ async function emitir(vid, tipo, fmt, oficial, novaRev) {
     const ant = (await DB.by('emissoes', 'vistoriaId', vid)).filter(e => e.tipo === tipo);
     if (ant.length) rev = Math.max(...ant.map(e => e.rev)) + (novaRev ? 1 : 0);
   }
+  /* Estado único: relatório e snapshot usam esta cópia (structuredClone antes de qualquer await adicional). */
+  const C = structuredClone({ obra: o, vistoria: v, fotos, S });
   /* Oficial: congela o conteúdo emitido e calcula o SHA-256 ANTES de gerar/registrar a emissão. */
   let snap = null;
   if (oficial) {
-    const conteudo = await SnapshotLib.capturar({ obra: o, vistoria: v, fotos, cfg: { empresa: S.empresa, rt: S.rt, usuario: S.usuario || '' }, emissao: { tipo, numero, rev }, appVersion: CGU.version });
+    const conteudo = await SnapshotLib.capturar({ obra: C.obra, vistoria: C.vistoria, fotos: C.fotos, cfg: { empresa: C.S.empresa, rt: C.S.rt, usuario: C.S.usuario || '' }, emissao: { tipo, numero, rev }, appVersion: CGU.version });
     snap = await SnapshotLib.criar({ id: DB.uid(), emissaoId: DB.uid(), formato: fmt, conteudo, appVersion: CGU.version });
   }
-  const ctx = { settings: S, obra: o, vistoria: v, fotos, numero, rev, draft: !oficial };
+  const ctx = { settings: C.S, obra: C.obra, vistoria: C.vistoria, fotos: C.fotos, numero, rev, draft: !oficial };
   const model = tipo === 'tecnico' ? Rep.buildTecnico(ctx) : tipo === 'consolidado' ? Rep.buildConsolidado(ctx) : Rep.buildFotografico(ctx);
-  const blob = fmt === 'docx' ? await Rep.toDocx(model, S, logo) : await Rep.toPdf(model, S, logo);
+  const blob = fmt === 'docx' ? await Rep.toDocx(model, C.S, logo) : await Rep.toPdf(model, C.S, logo);
   const pref = { tecnico: 'VT', fotografico: 'MF', consolidado: 'RC' }[tipo];
   const nome = oficial ? `${pref}-${pad(v.seq, 3)}-${v.ano}_Rev${pad(rev)}_${slug(o.nome)}_${slug(v.local)}.${fmt}` : `RASCUNHO_${pref}_${slug(o.nome)}_${slug(v.local)}.${fmt}`;
   if (oficial) {
-    await DB.registrarEmissao(snap, { id: snap.emissaoId, vistoriaId: v.id, obraId: o.id, tipo, formato: fmt, numero: model.meta.numero, rev, data: Date.now(), arquivo: nome, usuario: S.usuario || '', snapshotId: snap.id, snapshotHash: snap.hash, arquivoSha256: await SnapshotLib.hashBlob(blob) });
+    const arq = await SnapshotLib.criarArquivo({ id: DB.uid(), snapshot: snap, arquivo: nome, blob });
+    await DB.registrarEmissao(snap, { id: snap.emissaoId, vistoriaId: v.id, obraId: o.id, tipo, formato: fmt, numero: model.meta.numero, rev, data: Date.now(), arquivo: nome, usuario: C.S.usuario || '', snapshotId: snap.id, snapshotHash: snap.hash, arquivoSha256: arq.sha256, arquivoId: arq.id }, arq);
     const x = await DB.get('vistorias', vid); if (x.status !== 'emitido') { x.status = 'emitido'; await DB.put('vistorias', x); }
   }
   const el = modal(`<h2>Arquivo pronto</h2><div class="card small"><b>${esc(nome)}</b><div class="mut">${(blob.size / 1024).toFixed(0)} KB${oficial ? ' · registrado no painel' : ' · rascunho (sem registro)'}</div></div>
