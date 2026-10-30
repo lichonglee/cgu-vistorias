@@ -2,7 +2,7 @@
 importScripts('brand.js?v=1.0.6');
 const PREFIX = 'cgu-vistorias-' + new URL(self.registration.scope).pathname + '-';
 const CACHE = PREFIX + CGU.version;
-const FILES = ['./', 'index.html', 'app.css', 'brand.js', 'app.js', 'db.js', 'emission-snapshot.js', 'report.js', 'manifest.webmanifest',
+const FILES = ['./', 'index.html', 'app.css', 'brand.js', 'app.js', 'db.js', 'emission-snapshot.js', 'backup.js', 'report.js', 'manifest.webmanifest',
   'vendor/docx.iife.js', 'vendor/pdf-lib.min.js', 'assets/logo.png', 'assets/selo-cgu.svg',
   'assets/icon-180.png', 'assets/icon-192.png', 'assets/icon-512.png', 'manual.html', 'manual.css',
   'docs/manual-usuario.pdf', 'docs/diagramas.html', 'docs/diagramas/uml.svg', 'docs/diagramas/bpmn.svg', 'docs/telas/obras.png', 'docs/telas/obra.png', 'docs/telas/dados.png',

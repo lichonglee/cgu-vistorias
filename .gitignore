@@ -1,3 +1,7 @@
 node_modules/
 work/
 .DS_Store
+*.backup.json
+CGU-Vistorias_backup_*.json
+.env
+.env.*

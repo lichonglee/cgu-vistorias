@@ -1,7 +1,7 @@
 /* CGU Vistorias — aplicativo de campo + painel administrativo. Sem servidor: tudo roda e fica salvo no aparelho. */
 'use strict';
 const $ = s => document.querySelector(s);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const esc = Backup.escapeHtml;
 const pad = (n, l = 2) => String(n).padStart(l, '0');
 const hoje = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const agora = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
@@ -27,7 +27,7 @@ const AMBIENTES = {
   'Cobertura e subsolo': ['Cobertura / telhado', 'Laje de cobertura / terraço', 'Subsolo', 'Casa de máquinas de elevador (barrilete)'],
   'Outros': ['Outro ambiente']
 };
-const optG = (G, sel) => '<option value="">— Selecione —</option>' + Object.entries(G).map(([g, l]) => '<optgroup label="' + g + '">' + l.map(t => '<option' + (t === sel ? ' selected' : '') + '>' + t + '</option>').join('') + '</optgroup>').join('');
+const optG = (G, sel) => '<option value="">— Selecione —</option>' + Object.entries(G).map(([g, l]) => '<optgroup label="' + esc(g) + '">' + l.map(t => '<option value="' + esc(t) + '"' + (t === sel ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</optgroup>').join('');
 const GRAVS = ['Informativa', 'Baixa', 'Média', 'Alta', 'Crítica'];
 const gravCls = g => ({ Informativa: 'mut', Baixa: 'ok', 'Média': 'warn', Alta: 'warn', 'Crítica': 'bad' }[g] || 'mut');
 const METOD = 'Inspeção visual realizada in loco, com registro fotográfico georreferenciado e datado, sem ensaios destrutivos.';
@@ -143,13 +143,13 @@ async function photoSheet(id, fromCam) {
   const all = (await DB.by('fotos', 'vistoriaId', f.vistoriaId)).sort(byTs); const n = all.findIndex(x => x.id === id) + 1;
   const nums = [...new Set((f.marks || []).filter(m => m.t === 'num').map(m => m.n))].sort((x, y) => x - y);
   const el = modal(`<h2>Foto ${pad(n)}</h2><img class="big" src="${urlOf(f)}">
-    <div class="mut small">🕒 ${Rep.fTs(f.ts)}<br>📍 ${Rep.fLoc(f)}${f.origem === 'galeria' ? '<br>(importada da galeria)' : ''}</div>
+    <div class="mut small">🕒 ${esc(Rep.fTs(f.ts))}<br>📍 ${esc(Rep.fLoc(f))}${f.origem === 'galeria' ? '<br>(importada da galeria)' : ''}</div>
     <button class="btn sec block" id="pcr" style="margin-top:10px">✂ Recortar para caber na meia folha${f.cortada ? ' (já recortada)' : ''}</button>
     <button class="btn sec block" id="pfit" style="margin-top:8px">↘ Diminuir foto para caber inteira${f.ajustada ? ' (já ajustada)' : ''}</button>
     ${f.cropBackup ? `<button class="btn sec block" id="pun" style="margin-top:8px">↩ Desfazer ${f.cortada ? 'recorte' : 'redução'}</button>` : '' }
     <button class="btn sec block" id="pmk" style="margin-top:10px">${CGU.icon("pen")} Marcar foto (seta, formas, números)</button>
     <label>Descrição da foto (legenda)</label><textarea id="pd" rows="3" placeholder="Ex.: Fissura no pilar P12, 2º pavimento">${esc(f.descricao)}</textarea>
-    ${nums.length ? `<label>Legenda dos números marcados</label>${nums.map(k => `<div class="row" style="margin-bottom:6px"><b class="numb">${k}</b><input class="pn" data-n="${k}" placeholder="O que é o ponto ${k}?" value="${esc((f.notas || []).find(x => x.n === k)?.txt || '')}"></div>`).join('')}` : ''}
+    ${nums.length ? `<label>Legenda dos números marcados</label>${nums.map(k => `<div class="row" style="margin-bottom:6px"><b class="numb">${esc(k)}</b><input class="pn" data-n="${esc(k)}" placeholder="O que é o ponto ${esc(k)}?" value="${esc((f.notas || []).find(x => x.n === k)?.txt || '')}"></div>`).join('')}` : ''}
     <div class="row wrap" style="margin-top:12px"><button class="btn grow" id="ps">Salvar</button>${fromCam ? '<button class="btn sec grow" id="pn">Salvar e nova foto</button>' : ''}</div>
     <div class="row sp" style="margin-top:10px"><button class="btn bad sm" id="pdel">Excluir foto</button><button class="btn ghost sm" id="pc">Fechar</button></div>`);
   const save = async () => { f.descricao = $('#pd').value.trim(); f.notas = nums.map(k => ({ n: k, txt: (el.querySelector(`.pn[data-n="${k}"]`)?.value || '').trim() })); await DB.put('fotos', f); const v = await DB.get('vistorias', f.vistoriaId); await touchV(v); };
@@ -255,7 +255,7 @@ function recortarFoto(f, modo = 'crop') {
     ov.innerHTML = `<div class="ed-top"><button class="btn ghost sm" id="rcx">Cancelar</button><b>${encaixar ? 'Diminuir foto inteira' : 'Recortar foto'}</b><button class="btn sm" id="rcok">Aplicar</button></div>
       <div class="ed-stage"><canvas id="rcc"></canvas></div>
       <div class="ed-bar">
-        <select id="rcr" style="width:100%;margin-bottom:8px">${Object.entries(RECORTES).map(([k, v]) => '<option value="' + k + '">' + v[0] + '</option>').join('')}</select>
+        <select id="rcr" style="width:100%;margin-bottom:8px">${Object.entries(RECORTES).map(([k, v]) => '<option value="' + esc(k) + '">' + esc(v[0]) + '</option>').join('')}</select>
         <div class="ed-row" style="flex-wrap:nowrap"><span style="font-size:14px">${encaixar ? 'Ajuste' : 'Zoom'}</span><input id="rcz" type="range" min="30" max="100" value="100" style="flex:1" ${encaixar ? 'disabled' : ''}></div>
         <div class="ed-hint">${encaixar ? 'A foto inteira será reduzida e centralizada no formato escolhido.' : 'Arraste o quadro para escolher o trecho e puxe o canto inferior direito para ajustar o tamanho. Você pode reposicionar e redimensionar antes de aplicar.'}</div>
       </div>`;
@@ -345,7 +345,7 @@ async function vObras(view) {
   const rasc = vs.filter(v => v.status !== 'emitido').sort((a, b) => b.updatedAt - a.updatedAt)[0];
   const ob = rasc && obras.find(o => o.id === rasc.obraId);
   view.innerHTML = `
-    ${rasc && ob ? `<div class="card tap" data-go="#/vistoria/${rasc.id}" style="border-color:var(--a)"><div class="mut small">CONTINUAR VISTORIA</div><b>${esc(rasc.local || 'Sem local')}</b><div class="mut small">${esc(ob.nome)} · ${Rep.fData(rasc.data)} · ${rasc.nFotos || 0} foto(s)</div></div>` : ''}
+    ${rasc && ob ? `<div class="card tap" data-go="#/vistoria/${esc(rasc.id)}" style="border-color:var(--a)"><div class="mut small">CONTINUAR VISTORIA</div><b>${esc(rasc.local || 'Sem local')}</b><div class="mut small">${esc(ob.nome)} · ${esc(Rep.fData(rasc.data))} · ${Number(rasc.nFotos)||0} foto(s)</div></div>` : ''}
     <input id="q" type="search" placeholder="Buscar edifício ou cliente…" style="margin-bottom:12px">
     <div id="lst">${obras.map(o => cardObra(o, vs)).join('') || '<div class="empty">Nenhum edifício cadastrado.<br>Toque em <b>+ Edifício</b> para começar.</div>'}</div>
     <button class="btn fab" id="nova">+ Edifício</button>`;
@@ -353,7 +353,7 @@ async function vObras(view) {
   $('#q').oninput = e => { const q = e.target.value.toLowerCase(); $('#lst').innerHTML = obras.filter(o => (o.nome + ' ' + o.cliente).toLowerCase().includes(q)).map(o => cardObra(o, vs)).join('') || '<div class="empty">Nada encontrado.</div>'; bindGo(view); };
   $('#nova').onclick = () => obraSheet();
 }
-const cardObra = (o, vs) => { const mine = vs.filter(v => v.obraId === o.id); return `<div class="card tap" data-go="#/obra/${o.id}"><div class="row sp"><b>${esc(o.nome)}</b><span class="chip">${mine.length} vistoria(s)</span></div><div class="mut small">${esc(o.cliente || '')}${o.endereco ? ' · ' + esc(o.endereco) : ''}</div></div>`; };
+const cardObra = (o, vs) => { const mine = vs.filter(v => v.obraId === o.id); return `<div class="card tap" data-go="#/obra/${esc(o.id)}"><div class="row sp"><b>${esc(o.nome)}</b><span class="chip">${mine.length} vistoria(s)</span></div><div class="mut small">${esc(o.cliente || '')}${o.endereco ? ' · ' + esc(o.endereco) : ''}</div></div>`; };
 function bindGo(root) { root.querySelectorAll('[data-go]').forEach(el => el.onclick = () => location.hash = el.dataset.go); }
 function obraSheet(o) {
   const novo = !o; o = o || { id: DB.uid(), nome: '', cliente: '', endereco: '', contrato: '', art: '', criadoEm: Date.now() };
@@ -380,7 +380,7 @@ async function vObra(view, id) {
     <div class="row wrap" style="margin-top:10px"><button class="btn sec sm" id="eo">Editar edifício</button><button class="btn sec sm" id="xo">Exportar backup do edifício</button></div></div>
     <button class="btn block" id="nv">+ Nova vistoria</button>
     <h2>Vistorias / locais visitados</h2>
-    ${vs.map(v => `<div class="card tap" data-go="#/vistoria/${v.id}"><div class="row sp"><b>${esc(v.local || 'Sem local')}</b>${stChip(v)}</div><div class="mut small">${Rep.fData(v.data)} ${esc(v.hora || '')} · ${esc(v.tipo || '')} · ${v.nFotos || 0} foto(s)${v.seq ? ' · VT-' + pad(v.seq, 3) + '/' + v.ano : ''}</div></div>`).join('') || '<div class="empty">Nenhuma vistoria neste edifício.</div>'}
+    ${vs.map(v => `<div class="card tap" data-go="#/vistoria/${esc(v.id)}"><div class="row sp"><b>${esc(v.local || 'Sem local')}</b>${stChip(v)}</div><div class="mut small">${esc(Rep.fData(v.data))} ${esc(v.hora || '')} · ${esc(v.tipo || '')} · ${Number(v.nFotos)||0} foto(s)${v.seq ? ' · VT-' + esc(pad(v.seq, 3)) + '/' + esc(v.ano) : ''}</div></div>`).join('') || '<div class="empty">Nenhuma vistoria neste edifício.</div>'}
     <div style="margin-top:20px"><button class="btn bad sm" id="do">Excluir edifício</button></div>`;
   bindGo(view);
   $('#eo').onclick = () => obraSheet(o);
@@ -422,7 +422,7 @@ async function vVistoria(view, id) {
   if (tab === 'fotos') {
     tb.innerHTML = `<div class="row"><button class="btn grow" id="cam">${CGU.icon("camera")} Tirar foto</button><button class="btn sec grow" id="gal">${CGU.icon("image")} Da galeria</button></div>
       <p class="mut small">Fotos da câmera recebem data e hora do registro e GPS quando disponível. Fotos da galeria usam a data do arquivo e não recebem GPS${S.carimbo ? ', também gravadas na própria imagem' : ''}. Permita a localização quando o aparelho pedir.</p>
-      <div class="photos">${fotos.map((f, i) => `<div class="ph" data-p="${f.id}"><img src="${urlOf(f)}" loading="lazy"><b>${pad(i + 1)}</b><span class="gps">${f.lat != null ? '📍' : '—'}</span></div>`).join('')}</div>
+      <div class="photos">${fotos.map((f, i) => `<div class="ph" data-p="${esc(f.id)}"><img src="${urlOf(f)}" loading="lazy"><b>${pad(i + 1)}</b><span class="gps">${f.lat != null ? '📍' : '—'}</span></div>`).join('')}</div>
       ${fotos.length ? '' : '<div class="empty">Nenhuma foto ainda.</div>'}`;
     $('#cam').onclick = () => startCapture(v.id, 'cam'); $('#gal').onclick = () => startCapture(v.id, 'gal');
     tb.querySelectorAll('[data-p]').forEach(p => p.onclick = () => photoSheet(p.dataset.p, false));
@@ -430,7 +430,7 @@ async function vVistoria(view, id) {
   if (tab === 'const') {
     const C = v.constatacoes || [];
     tb.innerHTML = `<button class="btn block" id="nc">+ Nova constatação</button><p class="mut small">Registre cada achado com sua gravidade, recomendação e as fotos que o comprovam.</p>
-      ${C.map((c, i) => `<div class="card tap" data-c="${c.id}"><div class="row sp"><b>${pad(i + 1)}. ${esc(c.titulo || 'Sem título')}</b><span class="chip ${gravCls(c.gravidade)}">${esc(c.gravidade || '—')}</span></div><div class="mut small">${esc([c.ambiente, c.local].filter(Boolean).join(' · '))}${(c.fotoIds || []).length ? ' · ' + c.fotoIds.length + ' foto(s)' : ''}</div></div>`).join('') || '<div class="empty">Nenhuma constatação.</div>'}`;
+      ${C.map((c, i) => `<div class="card tap" data-c="${esc(c.id)}"><div class="row sp"><b>${pad(i + 1)}. ${esc(c.titulo || 'Sem título')}</b><span class="chip ${esc(gravCls(c.gravidade))}">${esc(c.gravidade || '—')}</span></div><div class="mut small">${esc([c.ambiente, c.local].filter(Boolean).join(' · '))}${(c.fotoIds || []).length ? ' · ' + c.fotoIds.length + ' foto(s)' : ''}</div></div>`).join('') || '<div class="empty">Nenhuma constatação.</div>'}`;
     $('#nc').onclick = () => constSheet(v, fotos);
     tb.querySelectorAll('[data-c]').forEach(e => e.onclick = () => constSheet(v, fotos, v.constatacoes.find(c => c.id === e.dataset.c)));
   }
@@ -448,7 +448,7 @@ function constSheet(v, fotos, c) {
     <label>Gravidade</label><select data-f="gravidade">${GRAVS.map(g => `<option ${g === c.gravidade ? 'selected' : ''}>${g}</option>`).join('')}</select>
     <label>Ambiente</label><select data-f="ambiente">${optG(AMBIENTES, c.ambiente)}</select>
     ${fld('Local / elemento (detalhe)', 'local', c, { ph: 'Ex.: Pilar P12 – 2º pav.' })}${fld('Descrição', 'descricao', c, { area: 1, rows: 4 })}${fld('Recomendação', 'recomendacao', c, { area: 1, rows: 3 })}
-    <label>Fotos relacionadas (toque para marcar)</label><div class="photos" id="sp">${fotos.map((f, i) => `<div class="ph ${c.fotoIds.includes(f.id) ? 'sel' : ''}" data-id="${f.id}"><img src="${urlOf(f)}"><b>${pad(i + 1)}</b></div>`).join('') || '<span class="mut small">Tire fotos primeiro na aba Fotos.</span>'}</div>
+    <label>Fotos relacionadas (toque para marcar)</label><div class="photos" id="sp">${fotos.map((f, i) => `<div class="ph ${c.fotoIds.includes(f.id) ? 'sel' : ''}" data-id="${esc(f.id)}"><img src="${urlOf(f)}"><b>${pad(i + 1)}</b></div>`).join('') || '<span class="mut small">Tire fotos primeiro na aba Fotos.</span>'}</div>
     <div class="row" style="margin-top:14px"><button class="btn grow" id="ok">Salvar</button>${novo ? '' : '<button class="btn bad" id="dl">Excluir</button>'}<button class="btn ghost" id="x">Fechar</button></div>`);
   let tipoAnt = c.tipo;
   bindFields(el, c, () => { });
@@ -485,7 +485,7 @@ async function vEmitir(tb, v, o, fotos) {
       <div class="row" style="margin-top:10px"><button class="btn grow" data-e="fotografico:docx">Word (.docx)</button><button class="btn grow" data-e="fotografico:pdf">PDF</button></div></div>
     <div class="card" style="border-color:var(--a)"><b>Relatório Consolidado</b> ${last('consolidado') ? `<span class="chip">Rev. ${pad(last('consolidado').rev)}</span>` : ''}<div class="mut small">Vistoria técnica e registro fotográfico em um único documento, com uma só capa e um só cabeçalho (numeração RC).</div>
       <div class="row" style="margin-top:10px"><button class="btn grow" data-e="consolidado:docx">Word (.docx)</button><button class="btn grow" data-e="consolidado:pdf">PDF</button></div></div>
-    <h3>Histórico de emissões</h3>${ems.map(e => `<div class="card small"><b>${esc(e.numero)} · Rev. ${pad(e.rev)}</b> <span class="chip mut">${e.formato.toUpperCase()}</span><div class="mut">${tipoNome(e.tipo)} · ${Rep.fTs(e.data)}${e.usuario ? ' · ' + esc(e.usuario) : ''}</div><div class="mut small">${SN_TXT[snEst[e.id].estado]}${e.snapshotHash ? ' · ' + e.snapshotHash.slice(0, 12) : ''}</div>${arEst[e.id] ? `<div class="mut small">Arquivo original: ${AR_TXT[arEst[e.id].estado]}</div>${arEst[e.id].estado === 'verificado' ? `<button class="btn ghost" data-arq="${e.id}">Baixar original verificado</button>` : ''}` : ''}</div>`).join('') || '<div class="mut small">Nenhuma emissão registrada.</div>'}`;
+    <h3>Histórico de emissões</h3>${ems.map(e => `<div class="card small"><b>${esc(e.numero)} · Rev. ${esc(pad(e.rev))}</b> <span class="chip mut">${esc(String(e.formato||'').toUpperCase())}</span><div class="mut">${esc(tipoNome(e.tipo))} · ${esc(Rep.fTs(e.data))}${e.usuario ? ' · ' + esc(e.usuario) : ''}</div><div class="mut small">${esc(SN_TXT[snEst[e.id].estado]||'Estado indisponível')}${e.snapshotHash ? ' · ' + esc(e.snapshotHash.slice(0, 12)) : ''}</div>${arEst[e.id] ? `<div class="mut small">Arquivo original: ${esc(AR_TXT[arEst[e.id].estado]||'Estado indisponível')}</div>${arEst[e.id].estado === 'verificado' ? `<button class="btn ghost" data-arq="${esc(e.id)}">Baixar original verificado</button>` : ''}` : ''}</div>`).join('') || '<div class="mut small">Nenhuma emissão registrada.</div>'}`;
   tb.querySelectorAll('[data-arq]').forEach(b => b.onclick = async () => {
     const e = ems.find(x => x.id === b.dataset.arq); const a = (await DB.all('arquivosEmitidos')).find(x => x.emissaoId === e.id);
     const r = await SnapshotLib.verificarArquivo(e, sns.find(s => s.id === e.snapshotId), a);
@@ -561,21 +561,21 @@ async function vPainel(view) {
   F.forEach(v => { const k = filtro.grupo === 'obra' ? (om[v.obraId]?.nome || '—') : (v.local || 'Sem local'); (grupos[k] ||= []).push(v); });
   view.innerHTML = `
     <div class="kpis"><div class="kpi"><b>${new Set(F.map(v => v.obraId)).size}</b><span>EDIFÍCIOS</span></div><div class="kpi"><b>${F.length}</b><span>VISTORIAS</span></div><div class="kpi"><b>${F.filter(v => v.status === 'emitido').length}</b><span>EMITIDAS</span></div><div class="kpi"><b>${F.filter(v => v.status !== 'emitido').length}</b><span>EM RASCUNHO</span></div><div class="kpi"><b>${nFotos}</b><span>FOTOS</span></div><div class="kpi"><b>${E.length}</b><span>EMISSÕES</span></div></div>
-    <div class="card"><div class="grid2"><div><label style="margin-top:0">Edifício</label><select data-f="obra"><option value="">Todos</option>${obras.map(o => `<option value="${o.id}" ${filtro.obra === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></div>
+    <div class="card"><div class="grid2"><div><label style="margin-top:0">Edifício</label><select data-f="obra"><option value="">Todos</option>${obras.map(o => `<option value="${esc(o.id)}" ${filtro.obra === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></div>
       <div><label style="margin-top:0">Situação</label><select data-f="status"><option value="">Todas</option><option value="rascunho" ${filtro.status === 'rascunho' ? 'selected' : ''}>Rascunho</option><option value="emitido" ${filtro.status === 'emitido' ? 'selected' : ''}>Emitido</option></select></div>
-      <div><label>De</label><input type="date" data-f="de" value="${filtro.de}"></div><div><label>Até</label><input type="date" data-f="ate" value="${filtro.ate}"></div></div>
+      <div><label>De</label><input type="date" data-f="de" value="${esc(filtro.de)}"></div><div><label>Até</label><input type="date" data-f="ate" value="${esc(filtro.ate)}"></div></div>
       <label>Buscar local ou edifício</label><input data-f="q" type="search" value="${esc(filtro.q)}"></div>
     <div class="seg"><button data-g="obra" class="${filtro.grupo === 'obra' ? 'on' : ''}">Agrupar por edifício</button><button data-g="local" class="${filtro.grupo === 'local' ? 'on' : ''}">Agrupar por local visitado</button></div>
-    ${Object.keys(grupos).sort().map(k => { const g = grupos[k]; const ge = E.filter(e => g.some(v => v.id === e.vistoriaId)); return `<h3>${esc(k)} <span class="mut small">· ${g.length} vistoria(s) · ${ge.length} emissão(ões)</span></h3><div class="tw"><table><tr><th>Nº</th><th>${filtro.grupo === 'obra' ? 'Local' : 'Edifício'}</th><th>Data</th><th>Situação</th><th>Fotos</th><th>Última emissão</th></tr>${g.map(v => { const le = E.find(e => e.vistoriaId === v.id); return `<tr data-go="#/vistoria/${v.id}" style="cursor:pointer"><td>${v.seq ? 'VT-' + pad(v.seq, 3) + '/' + v.ano : '—'}</td><td>${esc(filtro.grupo === 'obra' ? (v.local || '—') : (om[v.obraId]?.nome || '—'))}</td><td>${Rep.fData(v.data)}</td><td>${stChip(v)}</td><td>${v.nFotos || 0}</td><td>${le ? 'Rev. ' + pad(le.rev) + ' · ' + Rep.fTs(le.data).slice(0, 10) : '—'}</td></tr>`; }).join('')}</table></div>`; }).join('') || '<div class="empty">Nenhuma vistoria para os filtros.</div>'}
+    ${Object.keys(grupos).sort().map(k => { const g = grupos[k]; const ge = E.filter(e => g.some(v => v.id === e.vistoriaId)); return `<h3>${esc(k)} <span class="mut small">· ${g.length} vistoria(s) · ${ge.length} emissão(ões)</span></h3><div class="tw"><table><tr><th>Nº</th><th>${filtro.grupo === 'obra' ? 'Local' : 'Edifício'}</th><th>Data</th><th>Situação</th><th>Fotos</th><th>Última emissão</th></tr>${g.map(v => { const le = E.find(e => e.vistoriaId === v.id); return `<tr data-go="#/vistoria/${esc(v.id)}" style="cursor:pointer"><td>${v.seq ? 'VT-' + esc(pad(v.seq, 3)) + '/' + esc(v.ano) : '—'}</td><td>${esc(filtro.grupo === 'obra' ? (v.local || '—') : (om[v.obraId]?.nome || '—'))}</td><td>${esc(Rep.fData(v.data))}</td><td>${stChip(v)}</td><td>${Number(v.nFotos)||0}</td><td>${le ? 'Rev. ' + esc(pad(le.rev)) + ' · ' + esc(Rep.fTs(le.data).slice(0, 10)) : '—'}</td></tr>`; }).join('')}</table></div>`; }).join('') || '<div class="empty">Nenhuma vistoria para os filtros.</div>'}
     <div class="row sp"><h2>Registro de emissões</h2><button class="btn sec sm" id="csv">Exportar CSV</button></div>
-    <div class="tw"><table><tr><th>Data/hora</th><th>Documento</th><th>Rev.</th><th>Tipo</th><th>Fmt</th><th>Edifício · Local</th><th>Emitido por</th></tr>${E.slice(0, 80).map(e => `<tr><td>${Rep.fTs(e.data)}</td><td>${esc(e.numero)}</td><td>${pad(e.rev)}</td><td>${tipoNome(e.tipo, true)}</td><td>${e.formato.toUpperCase()}</td><td>${esc((om[e.obraId]?.nome || '') + ' · ' + (vm[e.vistoriaId]?.local || ''))}</td><td>${esc(e.usuario || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="mut">Sem emissões.</td></tr>'}</table></div>`;
+    <div class="tw"><table><tr><th>Data/hora</th><th>Documento</th><th>Rev.</th><th>Tipo</th><th>Fmt</th><th>Edifício · Local</th><th>Emitido por</th></tr>${E.slice(0, 80).map(e => `<tr><td>${esc(Rep.fTs(e.data))}</td><td>${esc(e.numero)}</td><td>${esc(pad(e.rev))}</td><td>${esc(tipoNome(e.tipo, true))}</td><td>${esc(String(e.formato||'').toUpperCase())}</td><td>${esc((om[e.obraId]?.nome || '') + ' · ' + (vm[e.vistoriaId]?.local || ''))}</td><td>${esc(e.usuario || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="mut">Sem emissões.</td></tr>'}</table></div>`;
   bindGo(view);
   view.querySelectorAll('[data-f]').forEach(el => el.onchange = () => { filtro[el.dataset.f] = el.value; route(); });
   view.querySelectorAll('[data-f="q"]').forEach(el => { el.onchange = null; el.onkeydown = e => { if (e.key === 'Enter') { filtro.q = el.value; route(); } }; el.onblur = () => { if (filtro.q !== el.value) { filtro.q = el.value; route(); } }; });
   view.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { filtro.grupo = b.dataset.g; route(); });
   $('#csv').onclick = () => {
     const rows = [['Data/hora', 'Documento', 'Revisão', 'Tipo', 'Formato', 'Edifício', 'Local', 'Arquivo', 'Emitido por', 'Snapshot SHA-256'], ...E.map(e => [Rep.fTs(e.data), e.numero, pad(e.rev), e.tipo, e.formato, om[e.obraId]?.nome || '', vm[e.vistoriaId]?.local || '', e.arquivo, e.usuario || '', e.snapshotHash || 'sem snapshot'])];
-    baixar(new Blob(['﻿' + rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n')], { type: 'text/csv' }), `emissoes_CGU_${hoje()}.csv`);
+    baixar(new Blob(['﻿' + rows.map(r => r.map(Backup.csvCell).join(';')).join('\r\n')], { type: 'text/csv' }), `emissoes_CGU_${hoje()}.csv`);
   };
 }
 
@@ -603,28 +603,35 @@ async function vAjustes(view) {
 }
 const blobToData = b => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); });
 async function exportBackup(obraId) {
+  if (!await confirmar('Este backup contém dados de vistoria, fotos, GPS e dados profissionais (como CREA). O arquivo JSON não é criptografado; guarde-o somente em local autorizado. Continuar?')) return;
   toast('Preparando backup…');
   let obras = await DB.all('obras'), vs = await DB.all('vistorias'), ems = await DB.all('emissoes');
   if (obraId) { obras = obras.filter(o => o.id === obraId); vs = vs.filter(v => v.obraId === obraId); ems = ems.filter(e => e.obraId === obraId); }
-  const vids = new Set(vs.map(v => v.id)); const seqs = {};
+  const vids = new Set(vs.map(v => v.id)), eids = new Set(ems.map(e => e.id)); const seqs = {};
   for (const k of [new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1]) seqs[k] = await DB.getSetting('seq-' + k, 0);
-  const parts = [`{"app":"cgu-vistorias","v":1,"appVersion":"${CGU.version}","exportadoEm":${Date.now()},"seqs":${JSON.stringify(seqs)},"obras":${JSON.stringify(obras)},"vistorias":${JSON.stringify(vs)},"emissoes":${JSON.stringify(ems)},"fotos":[`];
-  let first = true;
-  for (const f of await DB.all('fotos')) { if (!vids.has(f.vistoriaId)) continue; const { blob, base, ...rest } = f; parts.push((first ? '' : ',') + JSON.stringify({ ...rest, data: await blobToData(blob), baseData: base ? await blobToData(base) : undefined })); first = false; }
-  parts.push(']}');
-  baixar(new Blob(parts, { type: 'application/json' }), `CGU-Vistorias_backup_${obraId ? 'edificio_' : ''}${hoje()}.json`);
+  const fotos=[]; for(const f of await DB.all('fotos')) if(vids.has(f.vistoriaId)) fotos.push(await Backup.photoJson(f,blobToData));
+  const snapshots=(await DB.all('snapshots')).filter(x=>eids.has(x.emissaoId));
+  const arquivos=[]; for(const a of await DB.all('arquivosEmitidos')) if(eids.has(a.emissaoId)){const {blob,...rest}=a;arquivos.push({...rest,data:await blobToData(blob)});}
+  const d={app:'cgu-vistorias',v:1,appVersion:CGU.version,exportadoEm:Date.now(),seqs,obras,vistorias:vs,emissoes:ems,fotos};
+  if(snapshots.length)d.snapshots=snapshots;if(arquivos.length)d.arquivosEmitidos=arquivos;
+  const blob=new Blob([JSON.stringify(d)],{type:'application/json'});
+  if(blob.size>Backup.limits.MAX_BACKUP_BYTES) return toast('Backup excede o limite de 512 MiB.',5000);
+  baixar(blob, `CGU-Vistorias_backup_${hoje()}.json`);
 }
 $('#impIn').addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = ''; if (!file) return;
   try {
-    toast('Importando…'); const d = JSON.parse(await file.text());
-    if (d?.v !== 1 || !['obras', 'vistorias', 'emissoes', 'fotos'].every(k => Array.isArray(d[k]))) throw new Error('arquivo inválido');
-    for (const o of d.obras) await DB.put('obras', o);
-    for (const v of d.vistorias) { const cur = await DB.get('vistorias', v.id); if (!cur || (cur.updatedAt || 0) <= (v.updatedAt || 0)) await DB.put('vistorias', v); }
-    for (const x of d.emissoes) await DB.put('emissoes', x);
-    for (const f of d.fotos) { const { data, baseData, ...rest } = f; const o = { ...rest, blob: await (await fetch(data)).blob() }; if (baseData) o.base = await (await fetch(baseData)).blob(); await DB.put('fotos', o); }
-    for (const [ano, n] of Object.entries(d.seqs || {})) { const cur = await DB.getSetting('seq-' + ano, 0); if (n > cur) await DB.setSetting('seq-' + ano, n); }
-    toast(`Importado: ${d.obras.length} edifício(s), ${d.vistorias.length} vistoria(s), ${d.fotos.length} foto(s)`, 4500); route();
+    if(file.size>Backup.limits.MAX_BACKUP_BYTES)throw new Error('Backup excede o limite de 512 MiB. Nada foi importado.');
+    toast('Validando backup…'); const d=JSON.parse(await file.text());
+    const checked=await Backup.validate(d,file.size,SnapshotLib); const photos=d.fotos.map(f=>Backup.decodePhoto(f));
+    const artifacts=(d.arquivosEmitidos||[]).map(a=>{const bytes=Backup.artifactData(a.data,a.mime,a.bytes);return {...a,blob:new Blob([bytes],{type:a.mime})};});
+    const snapshots=d.snapshots||[], snapById=new Map(snapshots.map(s=>[s.id,s])), artifactById=new Map(artifacts.map(a=>[a.id,a]));
+    let semSnapshot=0,semArquivo=0;
+    for(const em of d.emissoes){const sn=em.snapshotId&&snapById.get(em.snapshotId);em.estadoSnapshot=sn?(await SnapshotLib.verificarEmissao(em,sn)).estado:(em.snapshotId?'ausente':'legado');em.estadoArquivo='ausente';if(em.estadoSnapshot==='ausente')semSnapshot++;const ar=em.arquivoId&&artifactById.get(em.arquivoId);if(ar){em.estadoArquivo=(await SnapshotLib.verificarArquivo(em,sn,ar)).estado;}if(em.estadoArquivo==='ausente')semArquivo++;}
+    const result=await DB.atomicImport({...checked.data,fotos:photos,arquivosEmitidos:artifacts,snapshots});
+    const c=result.conflitos.length;
+    toast(`Importação: ${result.novos} novos, ${result.duplicados} duplicados, ${c} conflitos locais preservados, ${semSnapshot} snapshots ausentes, ${semArquivo} arquivos ausentes.`,7000);
+    if(c)modal(`<h2>Conflitos mantidos localmente</h2><p>Os itens locais não foram sobrescritos. Sem tombstones, itens apagados podem reaparecer na próxima importação.</p><ul>${result.conflitos.map(x=>`<li>${esc(x.store)} · ${esc(x.id)}</li>`).join('')}</ul><button class="btn block" id="cfclose">Fechar</button>`).querySelector('#cfclose').onclick=()=>{closeModal();route();};else route();
   } catch (err) { toast('Falha ao importar: ' + err.message, 5000); }
 });
 
@@ -633,7 +640,7 @@ let deferredInstall = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
 (async () => {
   await DB.open(); await loadSettings(); await loadLogo();
-  if (navigator.storage?.persist) navigator.storage.persist();
+  if (navigator.storage?.persist) navigator.storage.persist().then(ok=>{if(!ok)toast('O navegador não garantiu armazenamento persistente. Exporte backup regularmente.',6000);}).catch(()=>toast('Não foi possível confirmar armazenamento persistente. Exporte backup regularmente.',6000));
   document.querySelector('#version').textContent = `v${CGU.version} · ${CGU.updated}`;
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => { });
   route();

@@ -50,7 +50,7 @@ const DB = (() => {
     registrarEmissao(sn, em, arq) {
       return new Promise((res, rej) => {
         const t = db.transaction(['snapshots', 'arquivosEmitidos', 'emissoes'], 'readwrite');
-        t.objectStore('snapshots').add(sn); t.objectStore('arquivosEmitidos').add(arq); t.objectStore('emissoes').put(em);
+        t.objectStore('snapshots').add(sn); t.objectStore('arquivosEmitidos').add(arq); t.objectStore('emissoes').add(em);
         t.oncomplete = () => res(em); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
       });
     },
@@ -73,6 +73,61 @@ const DB = (() => {
             v.seq = n; v.ano = ano; vs.put(v); out = { seq: n, ano };
           };
         };
+      });
+    },
+    atomicImport(batch) {
+      const stores = ['obras','vistorias','fotos','snapshots','arquivosEmitidos','emissoes','settings'];
+      return new Promise((resolve, reject) => {
+        const t = db.transaction(stores, 'readwrite');
+        const result = { novos: 0, duplicados: 0, conflitos: [] };
+        const stable = v => JSON.stringify(v, (k,x) => x && typeof x === 'object' && !(x instanceof Blob) && !Array.isArray(x) ? Object.keys(x).sort().reduce((o,key)=>(o[key]=x[key],o),{}) : x);
+        const same = (a,b) => stable(a) === stable(b);
+        const addOrCompare = (store, incoming, key, compareHash) => {
+          const s = t.objectStore(store);
+          const req = s.get(incoming[key]);
+          req.onsuccess = () => {
+            const old = req.result;
+            if (!old) { s.add(incoming); result.novos++; return; }
+            if (compareHash && old[compareHash] && old[compareHash] === incoming[compareHash]) { result.duplicados++; return; }
+            if (store !== 'fotos' && store !== 'arquivosEmitidos' && store !== 'snapshots' && same(old,incoming)) { result.duplicados++; return; }
+            if (store === 'vistorias' && same(old,incoming)) { result.duplicados++; return; }
+            result.conflitos.push({ store, id: incoming[key], acao: 'mantido_local' });
+          };
+        };
+        // Independent records are added only when absent; collisions preserve local data.
+        for (const x of batch.obras) addOrCompare('obras',x,'id');
+        for (const x of batch.vistorias) addOrCompare('vistorias',x,'id');
+        for (const x of batch.fotos) addOrCompare('fotos',x,'id');
+        const snaps = new Map((batch.snapshots || []).map(x=>[x.id,x]));
+        const files = new Map((batch.arquivosEmitidos || []).map(x=>[x.id,x]));
+        const filesByEmission = new Map((batch.arquivosEmitidos || []).map(x=>[x.emissaoId,x]));
+        const sameEmission = (a,b) => { const x={...a},y={...b}; delete x.estadoSnapshot;delete x.estadoArquivo;delete y.estadoSnapshot;delete y.estadoArquivo;return same(x,y); };
+        const conflict = (store,x) => result.conflitos.push({store,id:x.id,acao:'mantido_local'});
+        for (const em of batch.emissoes) {
+          const er=t.objectStore('emissoes').get(em.id);
+          er.onsuccess=()=>{
+            const oldEm=er.result;
+            if(oldEm&&!sameEmission(oldEm,em)){conflict('emissoes',em);return;}
+            const sn=em.snapshotId&&snaps.get(em.snapshotId), ar=(em.arquivoId&&files.get(em.arquivoId))||filesByEmission.get(em.id);
+            const verifyRef=(store,item,refId,expectedHash,hashKey,done)=>{
+              const key=item?.id||refId;if(!key){done(null);return;}
+              const req=t.objectStore(store).get(key);
+              req.onsuccess=()=>{const old=req.result;if(!old){done(item?{old:null}:null);return;}if(old[hashKey]===expectedHash){done({old,duplicate:true});return;}conflict(store,item||{id:key});done({error:true});};
+            };
+            verifyRef('snapshots',sn,em.snapshotId,em.snapshotHash,'hash',sres=>verifyRef('arquivosEmitidos',ar,em.arquivoId,em.arquivoSha256,'sha256',ares=>{
+              if(sres?.error||ares?.error){conflict('emissoes',em);return;}
+              const ss=t.objectStore('snapshots'),fs=t.objectStore('arquivosEmitidos'),es=t.objectStore('emissoes');
+              if(sn&&!sres?.old){ss.add(sn);result.novos++;}else if(sn&&sres?.duplicate)result.duplicados++;
+              if(ar&&!ares?.old){fs.add(ar);result.novos++;}else if(ar&&ares?.duplicate)result.duplicados++;
+              if(!oldEm){es.add(em);result.novos++;}else result.duplicados++;
+            }));
+          };
+        }
+        for (const [year, value] of Object.entries(batch.seqs || {})) {
+          const s=t.objectStore('settings'), key='seq-'+year, req=s.get(key);
+          req.onsuccess=()=>{ if (Number.isInteger(value) && value > (req.result?.value || 0)) s.put({key,value}); };
+        }
+        t.oncomplete=()=>resolve(result); t.onerror=()=>reject(t.error); t.onabort=()=>reject(t.error || new Error('Importação cancelada; nenhuma alteração foi gravada.'));
       });
     },
     async nextSeq(ano) {
