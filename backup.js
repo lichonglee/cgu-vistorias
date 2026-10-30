@@ -15,7 +15,7 @@
     obras: ['id','nome','cliente','endereco','contrato','art','criadoEm'],
     vistorias: ['id','obraId','local','tipo','data','hora','participantes','clima','objetivo','metodologia','documentos','descricao','constatacoes','conclusao','recomendacoes','status','nFotos','gps','criadoEm','updatedAt','seq','ano'],
     constatacoes: ['id','titulo','tipo','gravidade','ambiente','local','descricao','recomendacao','fotoIds'],
-    emissoes: ['id','vistoriaId','obraId','tipo','formato','numero','rev','data','arquivo','usuario','snapshotId','snapshotHash','arquivoSha256','arquivoId','estadoSnapshot','estadoArquivo'],
+    emissoes: ['id','vistoriaId','obraId','tipo','formato','numero','rev','data','arquivo','usuario','snapshotId','snapshotHash','arquivoSha256','arquivoId'],
     fotos: ['id','vistoriaId','ts','lat','lon','acc','descricao','origem','w','h','stampLines','marks','notas','cortada','ajustada','cropBackup','data','baseData'],
     crop: ['blob','base','marks','notas','stampLines','w','h','cortada','ajustada'],
     snapshots: ['id','schema','schemaVersion','canonicalizacao','hashAlgoritmo','hash','criadoEm','appVersion','emissaoId','vistoriaId','obraId','tipo','formato','numero','rev','conteudo'],
@@ -29,7 +29,7 @@
   }
   function safeTree(o, depth = 0, key = '') {
     if (depth > MAX_DEPTH) fail('Profundidade JSON excedida');
-    if (typeof o === 'string') { if (o.length > (['data','baseData','blob'].includes(key)?MAX_DATA_STRING:MAX_STRING)) fail('Texto excede o limite'); return; }
+    if (typeof o === 'string') { if (o.length > (['data','baseData','blob','base'].includes(key)?MAX_DATA_STRING:MAX_STRING)) fail('Texto excede o limite'); return; }
     if (typeof o === 'number') { if (!Number.isFinite(o)) fail('Número inválido'); return; }
     if (o == null || typeof o === 'boolean') return;
     if (Array.isArray(o)) { if (o.length > MAX_ITEMS) fail('Lista excede o limite'); for (const x of o) safeTree(x, depth + 1); return; }

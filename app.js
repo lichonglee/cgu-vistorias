@@ -627,7 +627,7 @@ $('#impIn').addEventListener('change', async e => {
     const artifacts=(d.arquivosEmitidos||[]).map(a=>{const bytes=Backup.artifactData(a.data,a.mime,a.bytes);return {...a,blob:new Blob([bytes],{type:a.mime})};});
     const snapshots=d.snapshots||[], snapById=new Map(snapshots.map(s=>[s.id,s])), artifactById=new Map(artifacts.map(a=>[a.id,a]));
     let semSnapshot=0,semArquivo=0;
-    for(const em of d.emissoes){const sn=em.snapshotId&&snapById.get(em.snapshotId);em.estadoSnapshot=sn?(await SnapshotLib.verificarEmissao(em,sn)).estado:(em.snapshotId?'ausente':'legado');em.estadoArquivo='ausente';if(em.estadoSnapshot==='ausente')semSnapshot++;const ar=em.arquivoId&&artifactById.get(em.arquivoId);if(ar){em.estadoArquivo=(await SnapshotLib.verificarArquivo(em,sn,ar)).estado;}if(em.estadoArquivo==='ausente')semArquivo++;}
+    for(const em of d.emissoes){const sn=em.snapshotId&&snapById.get(em.snapshotId);const estadoSnapshot=sn?(await SnapshotLib.verificarEmissao(em,sn)).estado:(em.snapshotId?'ausente':'legado');if(estadoSnapshot==='ausente')semSnapshot++;const ar=em.arquivoId&&artifactById.get(em.arquivoId);const estadoArquivo=ar?(await SnapshotLib.verificarArquivo(em,sn,ar)).estado:'ausente';if(estadoArquivo==='ausente')semArquivo++;}
     const result=await DB.atomicImport({...checked.data,fotos:photos,arquivosEmitidos:artifacts,snapshots});
     const c=result.conflitos.length;
     toast(`Importação: ${result.novos} novos, ${result.duplicados} duplicados, ${c} conflitos locais preservados, ${semSnapshot} snapshots ausentes, ${semArquivo} arquivos ausentes.`,7000);

@@ -10,6 +10,7 @@ Branch local: `codex/security-hardening` (derivada de `origin/main`, v1.0.6).
 - Imagens aceitam apenas data URLs base64 JPEG/PNG/WebP, com assinatura e limites conferidos diretamente nos bytes; nunca fazem `fetch` da entrada. PDF/DOCX têm validador separado, MIME enumerado, magic bytes, tamanho e SHA-256 recalculado.
 - IDs legados de obras/vistorias/fotos/constatações aceitam `^[A-Za-z0-9_-]{8,64}$`, além de UUID, para preservar dados da v1. IDs de snapshots e arquivos oficiais são UUID. O fallback fica documentado no validador e nos testes.
 - `cropBackup` serializa `blob` e `base` como data URLs e os reconstrói como Blob. Os campos de marcação, notas, carimbo e dimensões também são validados.
+- Estados calculados de verificação de snapshot/arquivo não são aceitos no envelope nem persistidos junto da emissão; são recalculados na tela.
 - O backup alerta que pode conter fotos, GPS e CREA, não inclui nomes de edifício/pessoa no nome do arquivo e informa que o JSON não é cifrado.
 
 ## Política do navegador

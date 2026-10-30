@@ -36,11 +36,14 @@ test('rejects external data without issuing a fetch and decodes only bounded ima
 });
 test('cropBackup blob/base survive JSON roundtrip and restore as Blobs',async()=>{
   const toData=async b=>'data:image/jpeg;base64,'+Buffer.from(await b.arrayBuffer()).toString('base64');
-  const f={id:U(),vistoriaId:U(),blob:new Blob([Buffer.from([255,216,255,0])],{type:'image/jpeg'}),cropBackup:{blob:new Blob([Buffer.from([255,216,255,1])],{type:'image/jpeg'}),base:new Blob([Buffer.from([255,216,255,2])],{type:'image/jpeg'}),w:20,h:10,marks:[],notas:[],stampLines:['a'],cortada:true}};
+  const largeBase=Buffer.alloc(150*1024,7);largeBase.set([255,216,255],0);
+  const f={id:U(),vistoriaId:U(),blob:new Blob([Buffer.from([255,216,255,0])],{type:'image/jpeg'}),cropBackup:{blob:new Blob([Buffer.from([255,216,255,1])],{type:'image/jpeg'}),base:new Blob([largeBase],{type:'image/jpeg'}),w:20,h:10,marks:[],notas:[],stampLines:['a'],cortada:true}};
   const exported=await Backup.photoJson(f,toData);const restored=Backup.decodePhoto(JSON.parse(JSON.stringify(exported)));
   assert.deepEqual(Buffer.from(await restored.cropBackup.blob.arrayBuffer()),Buffer.from([255,216,255,1]));
-  assert.deepEqual(Buffer.from(await restored.cropBackup.base.arrayBuffer()),Buffer.from([255,216,255,2]));
+  assert.deepEqual(Buffer.from(await restored.cropBackup.base.arrayBuffer()),largeBase);
+  assert.ok(exported.cropBackup.base.length>150*1024);
   const d=base();const obra={id:U(),nome:'Obra'},vis={id:f.vistoriaId,obraId:obra.id};d.obras=[obra];d.vistorias=[vis];d.fotos=[exported];
+  await Backup.validate(d,JSON.stringify(d).length,S);
   d.fotos[0].cropBackup.marks=[{t:'script',n:'\"><img'}];
   await assert.rejects(()=>Backup.validate(d,JSON.stringify(d).length,S),/crop marks/);
 });
@@ -104,4 +107,8 @@ test('roundtrip backup preserves evidence bytes, crop undo source, snapshot and 
   const artifactBytes=Backup.artifactData(payload.arquivosEmitidos[0].data,'application/pdf',pdf.length);
   assert.deepEqual(Buffer.from(artifactBytes),pdf);
   assert.equal((await S.validar(snapshot)).ok,true);
+  const cosmetic=JSON.parse(JSON.stringify(payload));cosmetic.emissoes[0].estadoSnapshot='verificado';
+  await assert.rejects(()=>Backup.validate(cosmetic,JSON.stringify(cosmetic).length,S),/campo não permitido estadoSnapshot/);
+  delete cosmetic.emissoes[0].estadoSnapshot;cosmetic.emissoes[0].estadoArquivo='verificado';
+  await assert.rejects(()=>Backup.validate(cosmetic,JSON.stringify(cosmetic).length,S),/campo não permitido estadoArquivo/);
 });
