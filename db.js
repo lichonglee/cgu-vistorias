@@ -1,6 +1,7 @@
 /* CGU Vistorias — camada de dados local (IndexedDB). Tudo fica no próprio aparelho. */
 const DB = (() => {
   let db;
+  const photoQueues = new Map();
   const NAME = 'cgu-vistorias', VER = 2;
   function open() {
     return new Promise((res, rej) => {
@@ -27,18 +28,61 @@ const DB = (() => {
     const h = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
     return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
   };
+  const cloneRecord = value => {
+    if (typeof Blob !== 'undefined' && value instanceof Blob) return value;
+    if (Array.isArray(value)) return value.map(cloneRecord);
+    if (value && Object.getPrototypeOf(value) === Object.prototype) return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,cloneRecord(v)]));
+    return value;
+  };
+  function enqueuePhoto(id, task) {
+    const previous=photoQueues.get(id)||Promise.resolve();
+    const pending=previous.catch(()=>{}).then(task);
+    photoQueues.set(id,pending);
+    const cleanup=()=>{if(photoQueues.get(id)===pending)photoQueues.delete(id);};
+    pending.then(cleanup,cleanup);
+    return pending;
+  }
+  const delPhoto = id => enqueuePhoto(id,()=>new Promise((resolve,reject)=>{
+    const tx=db.transaction(['fotos'],'readwrite');tx.objectStore('fotos').delete(id);
+    tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error || new Error('Falha ao excluir foto.'));tx.onabort=()=>reject(tx.error || new Error('Exclusão da foto cancelada.'));
+  }));
+  /* Fila por foto mantém a ordem da chamada durante hash assíncrono e commit IndexedDB. */
+  function putPhoto(record) {
+    const backup = globalThis.Backup;
+    if (!backup || typeof backup.photoFingerprint !== 'function') return Promise.reject(new Error('Backup não carregado; foto não foi gravada.'));
+    const snapshot = cloneRecord(record), id = snapshot.id;
+    return enqueuePhoto(id,async()=>{
+      const helper = globalThis.Backup;
+      if (!helper || typeof helper.photoFingerprint !== 'function') throw new Error('Backup não carregado; foto não foi gravada.');
+      const incoming = { ...snapshot, contentSha256: await helper.photoFingerprint(snapshot) };
+      return new Promise((resolve,reject)=>{
+        const tx = db.transaction(['fotos','vistorias'],'readwrite'), vr=tx.objectStore('vistorias').get(incoming.vistoriaId);
+        let key, failure;
+        vr.onsuccess=()=>{if(!vr.result){failure=new Error('Vistoria ausente; foto não foi gravada.');tx.abort();return;}const req=tx.objectStore('fotos').put(incoming);req.onsuccess=()=>{key=req.result;};};
+        tx.oncomplete=()=>resolve(key);
+        tx.onerror=()=>reject(tx.error || new Error('Falha ao gravar foto.'));
+        tx.onabort=()=>reject(failure || tx.error || new Error('Gravação da foto cancelada.'));
+      });
+    });
+  }
   return {
     open, uid,
     all: s => w(st(s).getAll()),
     get: (s, id) => w(st(s).get(id)),
-    put: (s, o) => w(st(s, 'readwrite').put(o)),
-    del: (s, id) => w(st(s, 'readwrite').delete(id)),
+    async put(s, o) {
+      if (s === 'fotos') return putPhoto(o);
+      return w(st(s, 'readwrite').put(o));
+    },
+    del: (s, id) => s === 'fotos' ? delPhoto(id) : w(st(s, 'readwrite').delete(id)),
     by: (s, idx, v) => w(st(s).index(idx).getAll(v)),
     async getSetting(k, def) { const r = await w(st('settings').get(k)); return r ? r.value : def; },
     setSetting: (k, value) => w(st('settings', 'readwrite').put({ key: k, value })),
     async delVistoria(id) {
-      for (const f of await this.by('fotos', 'vistoriaId', id)) await this.del('fotos', f.id);
-      await this.del('vistorias', id);
+      return new Promise((resolve,reject)=>{
+        const tx=db.transaction(['fotos','vistorias'],'readwrite'),fs=tx.objectStore('fotos'),req=fs.index('vistoriaId').getAll(id);
+        req.onsuccess=()=>{for(const f of req.result)fs.delete(f.id);tx.objectStore('vistorias').delete(id);};
+        tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error || new Error('Falha ao excluir vistoria.'));tx.onabort=()=>reject(tx.error || new Error('Exclusão da vistoria cancelada.'));
+      });
     },
     async delObra(id) {
       for (const v of await this.by('vistorias', 'obraId', id)) await this.delVistoria(v.id);
@@ -97,7 +141,11 @@ const DB = (() => {
         // Independent records are added only when absent; collisions preserve local data.
         for (const x of batch.obras) addOrCompare('obras',x,'id');
         for (const x of batch.vistorias) addOrCompare('vistorias',x,'id');
-        for (const x of batch.fotos) addOrCompare('fotos',x,'id');
+        for (const x of batch.fotos) {
+          if (!/^[0-9a-f]{64}$/.test(x.contentSha256 || '')) { t.abort(); return; }
+          const s=t.objectStore('fotos'),req=s.get(x.id);
+          req.onsuccess=()=>{const old=req.result;if(!old){s.add(x);result.novos++;return;}if(globalThis.Backup?.classifyPhotoCollision(old.contentSha256,x.contentSha256)==='duplicata'){result.duplicados++;return;}result.conflitos.push({store:'fotos',id:x.id,acao:'mantido_local'});};
+        }
         const snaps = new Map((batch.snapshots || []).map(x=>[x.id,x]));
         const files = new Map((batch.arquivosEmitidos || []).map(x=>[x.id,x]));
         const filesByEmission = new Map((batch.arquivosEmitidos || []).map(x=>[x.emissaoId,x]));

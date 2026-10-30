@@ -623,7 +623,7 @@ $('#impIn').addEventListener('change', async e => {
   try {
     if(file.size>Backup.limits.MAX_BACKUP_BYTES)throw new Error('Backup excede o limite de 512 MiB. Nada foi importado.');
     toast('Validando backup…'); const d=JSON.parse(await file.text());
-    const checked=await Backup.validate(d,file.size,SnapshotLib); const photos=d.fotos.map(f=>Backup.decodePhoto(f));
+    const checked=await Backup.validate(d,file.size,SnapshotLib); const photos=d.fotos.map(f=>({...Backup.decodePhoto(f),contentSha256:checked.photoHashes.get(f.id)}));
     const artifacts=(d.arquivosEmitidos||[]).map(a=>{const bytes=Backup.artifactData(a.data,a.mime,a.bytes);return {...a,blob:new Blob([bytes],{type:a.mime})};});
     const snapshots=d.snapshots||[], snapById=new Map(snapshots.map(s=>[s.id,s])), artifactById=new Map(artifacts.map(a=>[a.id,a]));
     let semSnapshot=0,semArquivo=0;

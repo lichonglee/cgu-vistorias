@@ -11,6 +11,7 @@ Branch local: `codex/security-hardening` (derivada de `origin/main`, v1.0.6).
 - IDs legados de obras/vistorias/fotos/constatações aceitam `^[A-Za-z0-9_-]{8,64}$`, além de UUID, para preservar dados da v1. IDs de snapshots e arquivos oficiais são UUID. O fallback fica documentado no validador e nos testes.
 - `cropBackup` serializa `blob` e `base` como data URLs e os reconstrói como Blob. Os campos de marcação, notas, carimbo e dimensões também são validados.
 - Estados calculados de verificação de snapshot/arquivo não são aceitos no envelope nem persistidos junto da emissão; são recalculados na tela.
+- A importação calcula SHA-256 do conteúdo canônico da foto antes da transação; a transação compara esse digest com `contentSha256` persistido na foto local. Escritas normais de foto atualizam o digest numa fila por `fotoId`, que serializa hash e commit na ordem de chamada; sem `Backup.photoFingerprint`, a gravação falha fechada. A exportação omite o digest interno. Assim, reimportação idêntica de itens com digest conta como duplicata; conteúdo divergente gera conflito e mantém o local. Fotos legadas sem digest ficam conservadoramente como conflito até serem gravadas de novo pela aplicação, pois hash assíncrono fora da transação sem marcador persistido não é uma comparação atômica confiável.
 - O backup alerta que pode conter fotos, GPS e CREA, não inclui nomes de edifício/pessoa no nome do arquivo e informa que o JSON não é cifrado.
 
 ## Política do navegador
@@ -21,10 +22,10 @@ Branch local: `codex/security-hardening` (derivada de `origin/main`, v1.0.6).
 
 ```text
 node --test tests/backup.security.test.cjs tests/emission-snapshot.test.js
-35 pass, 0 fail, 0 skipped
+38 pass, 0 fail, 0 skipped
 ```
 
-Inclui negativos para ID com aspas, campo extra e `__proto__`, envelope v2/lista ausente, coleção excessiva, vistoria órfã, updatedAt com tipo errado, URLs externas sem chamada de rede, SVG/HTML, base64 e magic bytes inválidos, limite de blob, MIME/tamanho/digest PDF inválidos, snapshot adulterado, crop malformado e fórmulas CSV. O roundtrip verifica bytes da evidência, original de crop, snapshot e PDF emitido.
+Inclui negativos para ID com aspas, campo extra e `__proto__`, envelope v2/lista ausente, coleção excessiva, vistoria órfã, updatedAt com tipo errado, URLs externas sem chamada de rede, SVG/HTML, base64 e magic bytes inválidos, limite de blob, MIME/tamanho/digest PDF inválidos, snapshot adulterado, crop malformado e fórmulas CSV. Testa importação repetida de foto como duplicata e mesmo ID com conteúdo divergente como conflito preservando o local, hash concorrente serializado e gravação fail-closed sem `Backup`. O roundtrip verifica bytes da evidência, original de crop, snapshot e PDF emitido.
 
 Também passaram `node --check` em `app.js`, `db.js`, `backup.js` e `emission-snapshot.js`, e `git diff --check`.
 
