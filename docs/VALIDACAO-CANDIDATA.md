@@ -34,3 +34,16 @@ Preparada novamente a origem exclusiva de QA com uma fixture v1 conhecida; somen
 - Emissão legada manteve estado `legado` explícito.
 
 As rotinas reproduzíveis estão em `scripts/browser-qa`. Os resultados sintéticos da rodada constam em `docs/qa/round2.json`. Importação/exportação segura ainda não foi integrada. Revisão de coerência dos metadados da emissão e reserva de numeração concorrente foi solicitada ao Prisma e deve ter outra rodada de navegador.
+
+## Terceira rodada — 22db43e (Prisma f703884): numeração local atômica
+
+Cherry-pick de f703884 sobre b1284fc sem conflitos. `node --test`: 32 pass / 8 skip sem `FAKE_IDB` (os 8 testes de banco dependem de `fake-indexeddb`, instalado fora do repositório); 40 pass / 0 skip com `FAKE_IDB`.
+
+Ensaio em navegador real na origem 8767, com `db.js` carregado da candidata e banco temporário próprio (`cgu-qa-conc-tmp`, removido ao final; o banco da fixture QA não foi tocado). Quatro conexões independentes, 24 vistorias:
+
+- 24 reservas simultâneas (`Promise.all`) geraram sequências 1–24, sem lacuna nem duplicidade; contador do ano = 24.
+- Nova rodada de 24 reservas sobre as mesmas vistorias devolveu os mesmos números e não consumiu sequência.
+- 8 reservas simultâneas da mesma vistoria devolveram o mesmo número.
+- Vistoria inexistente rejeita e o contador permanece 24.
+
+Limite mantido: a numeração é local ao aparelho e não é única entre aparelhos. Fora do escopo desta rodada: PDF/DOCX ponta a ponta com a nova numeração e WebP no navegador.
