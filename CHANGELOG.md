@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 1.9.0 · 30/10/2026
+
+- Criar uma vistoria não solicita geolocalização automaticamente. O GPS inicial só é pedido após ação explícita em Usar minha localização; a captura de fotos mantém seu próprio fluxo de permissão.
+- Nenhuma mudança no esquema IndexedDB v3, snapshots ou formato do backup. A mudança reduz a coleta involuntária de localização neste aparelho.
+- Cache PWA atualizado para 1.9.0. Candidata local; PDF do manual, capturas antigas e gates institucionais seguem pendentes.
+
 ## 1.8.0 · 30/10/2026
 
 - Remove a API interna obsoleta e não atômica DB.nextSeq; emissões continuam usando somente reservarNumeracao, serializada por transação no IndexedDB deste aparelho.

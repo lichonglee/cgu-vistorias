@@ -392,7 +392,6 @@ async function vObra(view, id) {
   $('#nv').onclick = async () => {
     const v = { id: DB.uid(), obraId: o.id, local: '', tipo: TIPOS[0], data: hoje(), hora: agora(), participantes: S.usuario || '', clima: '', objetivo: '', metodologia: METOD, documentos: '', descricao: '', constatacoes: [], conclusao: '', recomendacoes: '', status: 'rascunho', nFotos: 0, gps: null, criadoEm: Date.now(), updatedAt: Date.now() };
     await DB.put('vistorias', v); tab = 'dados'; location.hash = '#/vistoria/' + v.id;
-    getPos().then(async p => { if (p) { const x = await DB.get('vistorias', v.id); if (x && !x.gps) { x.gps = p; await DB.put('vistorias', x); if (location.hash.includes(v.id) && tab === 'dados') route(); } } });
   };
 }
 const tipoNome = (t, curto) => ({ tecnico: 'Vistoria técnica', fotografico: curto ? 'Mem. fotográfico' : 'Memorial fotográfico', consolidado: 'Consolidado' }[t] || t);

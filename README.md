@@ -1,4 +1,4 @@
-# CGU Vistorias · v1.8.0
+# CGU Vistorias · v1.9.0
 
 Aplicação web instalável (PWA) para organizar vistorias, registrar evidências e gerar relatórios em Word e PDF com a identidade visual da Controladoria-Geral da União.
 
@@ -43,7 +43,7 @@ Os dados ficam no IndexedDB `cgu-vistorias`, no aparelho e navegador utilizados.
 
 A emissão oficial é um controle local de número e histórico; não representa aprovação institucional. A sequência é por aparelho e pode coincidir entre celulares. Defina um aparelho para a emissão final ou revise os números após consolidar.
 
-O PIN restringe apenas Painel e pode ser alterado em Ajustes; não protege os registros. Fotos da câmera recebem GPS quando disponível; as da galeria usam a data do arquivo e não recebem coordenadas. A redução de resolução segue o limite configurado em Ajustes.
+O PIN restringe apenas Painel e pode ser alterado em Ajustes; não protege os registros. Criar uma vistoria não consulta a localização automaticamente; use Usar minha localização para registrar o GPS inicial. Fotos da câmera seguem o fluxo de permissão de localização; as da galeria usam a data do arquivo e não recebem coordenadas. A redução de resolução segue o limite configurado em Ajustes.
 
 ## Desenvolvimento
 

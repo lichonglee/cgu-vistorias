@@ -11,6 +11,18 @@ const brandContext=vm.createContext({});
 vm.runInContext(read('brand.js')+';globalThis.identity=CGU;',brandContext);
 const identity=brandContext.identity;
 
+test('new inspection requests geolocation only after explicit user action',()=>{
+ const app=read('app.js');
+ const start=app.indexOf("$('#nv').onclick = async () => {");
+ const end=app.indexOf('\n  };',start);
+ assert.ok(start>=0&&end>start,'new-inspection handler found');
+ assert.doesNotMatch(app.slice(start,end),/getPos\s*\(/,'creation must not capture GPS in the background');
+ const gpsStart=app.indexOf("$('#gps').onclick = async () => {");
+ const gpsEnd=app.indexOf('\n    };',gpsStart);
+ assert.ok(gpsStart>=0&&gpsEnd>gpsStart,'explicit GPS action found');
+ assert.match(app.slice(gpsStart,gpsEnd),/getPos\s*\(/,'GPS remains available by explicit request');
+});
+
 test('a distribuição usa X.Y.Z consistente no produto, HTML e manifesto de ferramentas',()=>{
  assert.match(identity.version,/^\d+\.\d+\.\d+$/);
  assert.equal(JSON.parse(read('package.json')).version,identity.version);
