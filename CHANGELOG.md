@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 1.1.0 · 30/10/2026
+
+- Emissões passam a preservar snapshots e arquivos PDF/DOCX com verificação de integridade local; numeração por vistoria é reservada atomicamente no aparelho.
+- Backup JSON recebe validação estrita, limites, conferência de bytes e importação atômica; CSP e proteção de conteúdo são reforçadas.
+- Painel local agrega dimensões de constatações a partir de snapshots verificáveis, com denominadores, razão de densidade e limitações explícitas. Não é consolidação institucional nem calcula risco.
+- O IndexedDB evolui para o esquema v2. Faça um backup antes de atualizar: o código 1.0.6 não abre o banco migrado (VersionError); rollback exige restauração de um backup compatível.
+- O código 1.0.6 também não restaura snapshots nem arquivos emitidos do backup 1.1.0; o plano de rollback precisa preservar essa evidência. Cada implantação deve atualizar `CGU.version` para criar uma nova geração de cache.
+- Excluir uma vistoria/edifício pode deixar emissões, snapshots e arquivos emitidos retidos. Política de retenção e descarte ainda deve ser definida pelo responsável institucional.
+- Esta candidata ainda requer QA final em dispositivos reais, regeneração/conferência do manual PDF e decisões institucionais antes de qualquer publicação.
+
 ## 1.0.6 · 22/10/2026
 
 - Edição de fotos com recorte personalizado, ajuste para caber inteira e desfazer, preservando carimbo, marcações e legendas anteriores.

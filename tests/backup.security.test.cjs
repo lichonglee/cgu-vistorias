@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const APP_VERSION = JSON.parse(fs.readFileSync(require.resolve('../package.json'), 'utf8')).version;
 const vm = require('node:vm');
 const Backup = require('../backup.js');
 const S = require('../emission-snapshot.js');
@@ -65,7 +66,7 @@ test('CSP contains required same-origin restrictions and no inline script elemen
   for(const d of ["default-src 'self'","script-src 'self'","style-src 'self' 'unsafe-inline'","img-src 'self' blob: data:","connect-src 'self' data: blob:","object-src 'none'","base-uri 'none'","form-action 'none'","worker-src 'self'","manifest-src 'self'"])assert.ok(html.includes(d),d);
   assert.doesNotMatch(html,/<script\s*[^>]*>\s*[^<]/i);assert.doesNotMatch(html,/\son(?:error|load|click)=/i);
   const sw=fs.readFileSync(require.resolve('../sw.js'),'utf8'),brand=fs.readFileSync(require.resolve('../brand.js'),'utf8');
-  assert.match(sw,/importScripts\(['"]brand\.js\?v=1\.0\.6['"]\)/);assert.match(brand,/version:\s*['"]1\.0\.6['"]/);
+  assert.ok(sw.includes(`brand.js?v=${APP_VERSION}`));assert.ok(brand.includes(`version: '${APP_VERSION}'`));
   assert.match(sw,/['"]backup\.js['"]/);assert.match(html,/<script src="backup\.js"><\/script>/);
 });
 test('import schema rejects orphaned vistoria and wrong typed metadata',async()=>{

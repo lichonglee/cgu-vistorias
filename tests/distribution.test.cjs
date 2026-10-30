@@ -16,6 +16,37 @@ test('a distribuição usa X.Y.Z consistente no produto, HTML e manifesto de fer
  assert.equal(JSON.parse(read('package.json')).version,identity.version);
  assert.ok(read('index.html').includes('v'+identity.version+' ·'), 'versão de fallback no HTML');
  assert.ok(read('sw.js').includes('brand.js?v='+identity.version), 'versão no import do service worker');
+ assert.ok(read('README.md').startsWith('# CGU Vistorias · v'+identity.version));
+ assert.ok(read('LEIA-ME.md').startsWith('# CGU Vistorias v'+identity.version));
+ const manual=read('manual.html');
+ assert.ok(manual.includes('<title>Manual do usuário | CGU Vistorias v'+identity.version+'</title>'));
+ assert.ok(manual.includes('<span class="version">v'+identity.version+'</span>'));
+ assert.doesNotMatch(manual,/alt="[^"]*versão \d/,'capturas antigas não devem ser identificadas como telas da nova versão');
+ // Atualizar esta declaração quando as capturas forem refeitas para uma versão posterior.
+ assert.ok(read('LEIA-ME.md').includes('capturas de tela ainda são da versão 1.0.x'));
+ assert.ok(manual.includes('O bloco analítico usa snapshots verificáveis'));
+ assert.ok(manual.includes('GPS, snapshots e arquivos PDF/DOCX emitidos'));
+ assert.ok(manual.includes('aplicativo 1.0.6 não consegue abrir esse banco'));
+ assert.ok(manual.includes('responsável técnico/CREA e usuário) são incluídos nos snapshots'));
+ assert.ok(manual.includes('Baixar manual em PDF (versão 1.0.x; desatualizado)'));
+ assert.ok(read('CHANGELOG.md').startsWith('# Histórico de versões\n\n## '+identity.version+' · '));
+});
+
+test('precache força revalidação HTTP e ativação remove caches da versão anterior',async()=>{
+ const listeners={},requests=[],deleted=[];let cacheKeys=[];
+ const context=vm.createContext({URL,Request,location:{origin:'https://example.invalid'},
+  self:{registration:{scope:'https://example.invalid/cgu/'},clients:{claim:()=>Promise.resolve()},addEventListener:(name,fn)=>listeners[name]=fn,skipWaiting:()=>Promise.resolve()},
+  caches:{open:async()=>({add:async request=>requests.push(request)}),keys:async()=>cacheKeys,delete:async key=>{deleted.push(key);return true;}},importScripts(){}});
+ vm.runInContext(read('brand.js'),context);
+ vm.runInContext(read('sw.js')+';globalThis.cacheName=CACHE;globalThis.cachePrefix=PREFIX;globalThis.precacheFiles=FILES;',context);
+ assert.ok(context.cacheName.endsWith(identity.version));
+ let install;listeners.install({waitUntil:p=>install=p});await install;
+ assert.equal(requests.length,context.precacheFiles.length);
+ assert.ok(requests.every(request=>request.cache==='reload'));
+ assert.ok(requests.every(request=>new URL(request.url).origin==='https://example.invalid'));
+ cacheKeys=[context.cachePrefix+'1.0.6',context.cacheName,'unrelated-cache'];
+ let activation;listeners.activate({waitUntil:p=>activation=p});await activation;
+ assert.deepEqual(deleted,[context.cachePrefix+'1.0.6']);
 });
 
 test('todos os scripts próprios têm sintaxe JavaScript válida',()=>{

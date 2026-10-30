@@ -550,7 +550,14 @@ async function vPainel(view) {
     $('#go').onclick = async () => { if (await sha($('#pin').value) === S.pinHash) { sessionStorage.setItem('cgu-adm', S.pinHash); route(); } else toast('PIN incorreto'); };
     $('#pin').onkeydown = e => { if (e.key === 'Enter') $('#go').click(); }; return;
   }
-  const [obras, vs, ems] = await Promise.all([DB.all('obras'), DB.all('vistorias'), DB.all('emissoes')]);
+  const [obras, vs, ems, snaps] = await Promise.all([DB.all('obras'), DB.all('vistorias'), DB.all('emissoes'), DB.all('snapshots')]);
+  const sistemaPorTipo = Object.fromEntries(Object.entries(TIPOS_CONST).flatMap(([grupo, tipos]) => tipos.map(tipo => [tipo, grupo])));
+  const grupoPorAmbiente = Object.fromEntries(Object.entries(AMBIENTES).flatMap(([grupo, ambientes]) => ambientes.map(ambiente => [ambiente, grupo])));
+  let resumo = null;
+  try {
+    if (typeof Analytics !== 'undefined' && typeof Analytics.resumir === 'function') resumo = await Analytics.resumir({ obras, vistorias: vs, emissoes: ems, snapshots: snaps, snapshotLib: SnapshotLib, sistemaPorTipo, grupoPorAmbiente });
+  } catch (e) { console.error('Indicadores locais indisponíveis:', e); }
+  const listaDimensao = xs => xs.length ? `<ul class="small">${xs.map(x => `<li>${esc(x.label)}: <b>${x.count}</b></li>`).join('')}</ul>` : '<p class="mut small">Sem dados verificáveis nesta dimensão.</p>';
   const om = Object.fromEntries(obras.map(o => [o.id, o]));
   const dentro = v => (!filtro.obra || v.obraId === filtro.obra) && (!filtro.status || v.status === filtro.status) && (!filtro.de || v.data >= filtro.de) && (!filtro.ate || v.data <= filtro.ate) && (!filtro.q || ((v.local || '') + ' ' + (om[v.obraId]?.nome || '')).toLowerCase().includes(filtro.q.toLowerCase()));
   const F = vs.filter(dentro).sort((a, b) => b.data.localeCompare(a.data));
@@ -559,9 +566,22 @@ async function vPainel(view) {
   const nFotos = F.reduce((a, v) => a + (v.nFotos || 0), 0);
   const grupos = {};
   F.forEach(v => { const k = filtro.grupo === 'obra' ? (om[v.obraId]?.nome || '—') : (v.local || 'Sem local'); (grupos[k] ||= []).push(v); });
+  const analyticsSection = !resumo ? '<section class="card warnbox"><b>Indicadores locais indisponíveis.</b> A lista de vistorias continua disponível; atualize o aplicativo ou tente novamente.</section>' : `
+    <section class="card" aria-labelledby="local-analytics-title"><h2 id="local-analytics-title">Indicadores dos relatórios neste aparelho</h2>
+      <p class="warnbox">Visão local, não consolidada: os números cobrem somente este navegador e o inventário nele cadastrado. Snapshot verificado indica consistência interna, não autoria nem validação institucional, e não confere os bytes do PDF/DOCX. Os filtros de lista abaixo não alteram estes indicadores.</p>
+      <div class="kpis"><div class="kpi"><span>EDIFÍCIOS COM ÚLTIMO SNAPSHOT VERIFICÁVEL</span><b>${Analytics.formatRatio(resumo.kpis.coverage)}</b><span>Sem janela temporal; inventário local</span></div>
+        <div class="kpi"><span>DENSIDADE ALTA/CRÍTICA</span><b>${Analytics.formatDensity(resumo.kpis.severeDensity)}</b><span>Constatações por vistoria verificável; razão, não percentual</span></div>
+        <div class="kpi"><span>FORMALIZAÇÃO LOCAL</span><b>${Analytics.formatRatio(resumo.kpis.formalization)}</b><span>Vistorias com emissão / vistorias cadastradas</span></div>
+        <div class="kpi"><span>INTEGRIDADE DO SNAPSHOT</span><b>${Analytics.formatRatio(resumo.kpis.snapshotIntegrity)}</b><span>Vistorias com snapshot verificado / vistorias com emissão</span></div>
+        <div class="kpi"><span>CONSTATAÇÕES COM FOTO VINCULADA</span><b>${Analytics.formatRatio(resumo.kpis.photoAssociation)}</b><span>Constatações com foto existente / constatações verificáveis</span></div>
+        <div class="kpi"><span>GPS DE INÍCIO DISPONÍVEL</span><b>${Analytics.formatRatio(resumo.kpis.gpsAvailability)}</b><span>Indicador descritivo; não compõe nota de qualidade</span></div></div>
+      <div class="grid2"><div><h3>Constatações por gravidade</h3>${listaDimensao(resumo.dimensions.severity)}<h3>Constatações por grupo do sistema (catálogo da interface)</h3>${listaDimensao(resumo.dimensions.systemGroup)}</div>
+        <div><h3>Constatações por macroambiente (catálogo da interface)</h3>${listaDimensao(resumo.dimensions.environmentGroup)}<h3>Vistorias por mês</h3>${listaDimensao(resumo.dimensions.month)}</div></div>
+      <div class="warnbox"><b>Não calculado:</b> recorrência (não há vínculo estruturado entre achados), saneamento (não há ações corretivas estruturadas) e risco (rubrica de probabilidade/impacto não aprovada). ${resumo.counts.unverifiedLatestEmissions} vistoria(s) com emissão mais recente sem snapshot verificável ou com snapshots empatados divergentes foram excluídas das dimensões. ${resumo.stale.inspectionsEditedAfterEmission} vistoria(s) foram editadas após a emissão considerada; os indicadores refletem o conteúdo congelado na emissão.</div>
+    </section>`;
   view.innerHTML = `
-    <div class="kpis"><div class="kpi"><b>${new Set(F.map(v => v.obraId)).size}</b><span>EDIFÍCIOS</span></div><div class="kpi"><b>${F.length}</b><span>VISTORIAS</span></div><div class="kpi"><b>${F.filter(v => v.status === 'emitido').length}</b><span>EMITIDAS</span></div><div class="kpi"><b>${F.filter(v => v.status !== 'emitido').length}</b><span>EM RASCUNHO</span></div><div class="kpi"><b>${nFotos}</b><span>FOTOS</span></div><div class="kpi"><b>${E.length}</b><span>EMISSÕES</span></div></div>
-    <div class="card"><div class="grid2"><div><label style="margin-top:0">Edifício</label><select data-f="obra"><option value="">Todos</option>${obras.map(o => `<option value="${esc(o.id)}" ${filtro.obra === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></div>
+    <div class="kpis"><div class="kpi"><b>${new Set(F.map(v => v.obraId)).size}</b><span>EDIFÍCIOS</span></div><div class="kpi"><b>${F.length}</b><span>VISTORIAS</span></div><div class="kpi"><b>${F.filter(v => v.status === 'emitido').length}</b><span>EMITIDAS</span></div><div class="kpi"><b>${F.filter(v => v.status !== 'emitido').length}</b><span>EM RASCUNHO</span></div><div class="kpi"><b>${nFotos}</b><span>FOTOS</span></div><div class="kpi"><b>${E.length}</b><span>LINHAS DE EMISSÃO</span></div></div>
+${analyticsSection}    <div class="card"><div class="grid2"><div><label style="margin-top:0">Edifício</label><select data-f="obra"><option value="">Todos</option>${obras.map(o => `<option value="${esc(o.id)}" ${filtro.obra === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></div>
       <div><label style="margin-top:0">Situação</label><select data-f="status"><option value="">Todas</option><option value="rascunho" ${filtro.status === 'rascunho' ? 'selected' : ''}>Rascunho</option><option value="emitido" ${filtro.status === 'emitido' ? 'selected' : ''}>Emitido</option></select></div>
       <div><label>De</label><input type="date" data-f="de" value="${esc(filtro.de)}"></div><div><label>Até</label><input type="date" data-f="ate" value="${esc(filtro.ate)}"></div></div>
       <label>Buscar local ou edifício</label><input data-f="q" type="search" value="${esc(filtro.q)}"></div>
