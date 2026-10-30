@@ -46,6 +46,17 @@
   };
   const hasGps = gps => gps && Number.isFinite(gps.lat) && gps.lat >= -90 && gps.lat <= 90 && Number.isFinite(gps.lon) && gps.lon >= -180 && gps.lon <= 180;
 
+  function summarizeActions(migrationRecords = [], snapshots = [], actions = [], { asOf, now = Date.now() } = {}) {
+    const snapshotById=new Map(arr(snapshots).filter(s=>s?.id).map(s=>[s.id,s])), eligible=new Map();
+    for(const record of arr(migrationRecords)){const sn=snapshotById.get(record.snapshotId);for(const finding of arr(sn?.conteudo?.constatacoes))eligible.set(`${record.vistoriaId}|${finding?.id}`,finding);}
+    const key=a=>`${a?.vistoriaId}|${a?.constatacaoId}`;
+    const scoped=arr(actions).filter(a=>eligible.has(key(a))),active=scoped.filter(a=>a.estado==='aberta'||a.estado==='em-execucao'),completed=scoped.filter(a=>a.estado==='concluida'),declared=scoped.filter(a=>a.estado!=='cancelada');
+    const highCritical=[...eligible].filter(([,c])=>c?.gravidade==='Alta'||c?.gravidade==='Crítica');
+    const highCriticalWithoutAction=highCritical.filter(([k])=>!scoped.some(a=>key(a)===k&&a.estado!=='cancelada')).length;
+    const today=validDate(asOf)||periodFor(null,null).asOf;
+    return {completed:completed.length,declared:declared.length,active:active.length,cancelled:scoped.filter(a=>a.estado==='cancelada').length,overdue:active.filter(a=>typeof a.prazo==='string'&&a.prazo<today).length,aging30:active.filter(a=>Number.isFinite(a.criadoEm)&&now-a.criadoEm>30*86400000).length,highCriticalWithoutAction,highCriticalTotal:highCritical.length};
+  }
+
   async function resumir({ obras = [], vistorias = [], emissoes = [], snapshots = [], snapshotLib, sistemaPorTipo = {}, grupoPorAmbiente = {}, taxonomia, asOf, janelaMeses = null } = {}) {
     if (!snapshotLib || typeof snapshotLib.verificarEmissao !== 'function') throw new TypeError('SnapshotLib.verificarEmissao é obrigatório.');
     const O = arr(obras), V = arr(vistorias), E = arr(emissoes), S = arr(snapshots);
@@ -175,7 +186,7 @@
         coverage: { numerator: inspectedBuildings.size, denominator: obraIds.size, meaning: `Edifícios locais com snapshot verificável na janela (${period.label}) / edifícios cadastrados neste aparelho.` },
         severeDensity: { numerator: severe, denominator: scopedVerified.length, meaning: `Constatações Alta ou Crítica / vistorias com último snapshot verificável na janela (${period.label}).` },
         recurrence: { calculable: false, reason: 'Não há vínculo estruturado e validado entre constatações reincidentes.' },
-        remediation: { calculable: false, reason: 'Não há ciclo de ação corretiva estruturado no registro local.' },
+        remediation: { calculable: false, reason: 'Saneamento verificado não é calculado; ações locais são declarações do usuário sem comprovação de execução.' },
         formalization: { numerator: inspectionsWithEmission.size, denominator: scopedInspections.length, meaning: `Vistorias locais com emissão / vistorias na janela (${period.label}).` },
       snapshotIntegrity: { numerator: inspectionsWithVerified.size, denominator: inspectionsWithEmission.size, meaning: `Vistorias com snapshot selecionado verificável / vistorias com emissão na janela (${period.label}).` },
       photoAssociation: { numerator: linkedFindings, denominator: findings.length, meaning: 'Constatações com ao menos uma foto vinculada existente / constatações nos snapshots verificáveis.' },
@@ -193,5 +204,5 @@
     };
   }
 
-  return { resumir, GRAVIDADES, formatRatio, formatDensity, periodFor };
+  return { resumir, summarizeActions, GRAVIDADES, formatRatio, formatDensity, periodFor };
 });

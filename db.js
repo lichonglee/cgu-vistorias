@@ -2,7 +2,7 @@
 const DB = (() => {
   let db;
   const photoQueues = new Map();
-  const NAME = 'cgu-vistorias', VER = 2;
+  const NAME = 'cgu-vistorias', VER = 3;
   function open() {
     return new Promise((res, rej) => {
       const r = indexedDB.open(NAME, VER);
@@ -15,6 +15,7 @@ const DB = (() => {
         if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings', { keyPath: 'key' });
         if (!d.objectStoreNames.contains('arquivosEmitidos')) { const ar = d.createObjectStore('arquivosEmitidos', { keyPath: 'id' }); ar.createIndex('emissaoId', 'emissaoId'); ar.createIndex('snapshotId', 'snapshotId'); }
         if (!d.objectStoreNames.contains('snapshots')) { const sn = d.createObjectStore('snapshots', { keyPath: 'id' }); sn.createIndex('vistoriaId', 'vistoriaId'); sn.createIndex('emissaoId', 'emissaoId'); }
+        if (!d.objectStoreNames.contains('acoes')) { const ac = d.createObjectStore('acoes', { keyPath: 'id' }); ac.createIndex('vistoriaId', 'vistoriaId'); ac.createIndex('constatacaoId', 'constatacaoId'); ac.createIndex('snapshotId', 'snapshotId'); }
       };
       r.onsuccess = () => { db = r.result; res(); };
       r.onerror = () => rej(r.error);
@@ -28,6 +29,23 @@ const DB = (() => {
     const h = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
     return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
   };
+  const ACTION_STATES = ['aberta','em-execucao','concluida','cancelada'];
+  const ACTION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const ACTION_LEGACY_ID = /^[A-Za-z0-9_-]{8,64}$/;
+  function validateAction(a) {
+    if (!a || typeof a !== 'object' || Array.isArray(a)) throw new TypeError('Ação inválida.');
+    const allowed=['id','constatacaoId','vistoriaId','snapshotId','responsavelFuncao','prazo','estado','concluidaEm','observacao','criadoEm','atualizadoEm','rowVersion'];
+    if(Object.keys(a).some(k=>!allowed.includes(k))||Object.getPrototypeOf(a)!==Object.prototype)throw new TypeError('A ação contém campo inválido.');
+    if (!ACTION_UUID.test(a.id || '') || !ACTION_UUID.test(a.constatacaoId || '') || !(ACTION_UUID.test(a.vistoriaId || '') || ACTION_LEGACY_ID.test(a.vistoriaId || '')) || !ACTION_UUID.test(a.snapshotId || '')) throw new TypeError('IDs da ação inválidos.');
+    if (typeof a.responsavelFuncao !== 'string' || !a.responsavelFuncao.trim() || a.responsavelFuncao.length > 120) throw new TypeError('Função responsável inválida (máximo 120 caracteres).');
+    if (typeof a.prazo !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(a.prazo) || new Date(`${a.prazo}T00:00:00Z`).toISOString().slice(0,10) !== a.prazo) throw new TypeError('Prazo inválido.');
+    if (!ACTION_STATES.includes(a.estado)) throw new TypeError('Estado da ação inválido.');
+    if (typeof a.observacao !== 'string' || a.observacao.length > 500) throw new TypeError('Observação excede 500 caracteres.');
+    if (a.estado === 'concluida' ? !Number.isFinite(a.concluidaEm) || a.concluidaEm < 0 : a.concluidaEm != null) throw new TypeError('Data de conclusão incompatível com o estado.');
+    for(const k of ['criadoEm','atualizadoEm'])if(a[k]!=null&&(!Number.isFinite(a[k])||a[k]<0))throw new TypeError('Data da ação inválida.');
+    if(a.rowVersion!=null&&(!Number.isSafeInteger(a.rowVersion)||a.rowVersion<1))throw new TypeError('rowVersion inválido.');
+    return a;
+  }
   const cloneRecord = value => {
     if (typeof Blob !== 'undefined' && value instanceof Blob) return value;
     if (Array.isArray(value)) return value.map(cloneRecord);
@@ -73,14 +91,44 @@ const DB = (() => {
       if (s === 'fotos') return putPhoto(o);
       return w(st(s, 'readwrite').put(o));
     },
+    putAcao(action, expectedRowVersion = 0) {
+      try { validateAction(action); } catch (error) { return Promise.reject(error); }
+      if (!Number.isSafeInteger(expectedRowVersion) || expectedRowVersion < 0) return Promise.reject(new TypeError('rowVersion esperado inválido.'));
+      return new Promise((resolve,reject)=>{
+        const tx=db.transaction(['acoes','vistorias','snapshots'],'readwrite'), store=tx.objectStore('acoes'); let saved, failure, vistoria, snapshot, current, ready=0;
+        const persist=()=>{
+          if(++ready!==3)return;
+          if((current?.rowVersion||0)!==expectedRowVersion){failure=Object.assign(new Error('A ação foi alterada em outra tela. Recarregue antes de salvar.'),{code:'ACAO_CONFLICT'});tx.abort();return;}
+          if(!current&&expectedRowVersion!==0){failure=Object.assign(new Error('A ação não existe mais.'),{code:'ACAO_CONFLICT'});tx.abort();return;}
+          if(current&&(current.vistoriaId!==action.vistoriaId||current.constatacaoId!==action.constatacaoId||current.snapshotId!==action.snapshotId)){failure=Object.assign(new Error('Os vínculos da ação são imutáveis.'),{code:'ACAO_LINK_INVALID'});tx.abort();return;}
+          const findingIds=new Set((snapshot?.conteudo?.constatacoes||[]).map(c=>c?.id));
+          if(!vistoria||!snapshot||snapshot.vistoriaId!==action.vistoriaId||!findingIds.has(action.constatacaoId)){failure=Object.assign(new Error('A ação precisa apontar para uma constatação existente no snapshot da vistoria.'),{code:'ACAO_LINK_INVALID'});tx.abort();return;}
+          const now=Date.now(); saved={...action,rowVersion:(current?.rowVersion||0)+1,criadoEm:current?.criadoEm||now,atualizadoEm:now};
+          try{validateAction(saved);store.put(saved);}catch(error){failure=error;tx.abort();}
+        };
+        const req=store.get(action.id);req.onsuccess=()=>{current=req.result;persist();};
+        tx.objectStore('vistorias').get(action.vistoriaId).onsuccess=e=>{vistoria=e.target.result;persist();};
+        tx.objectStore('snapshots').get(action.snapshotId).onsuccess=e=>{snapshot=e.target.result;persist();};
+        tx.oncomplete=()=>resolve(saved);tx.onerror=()=>reject(failure||tx.error||new Error('Falha ao salvar ação.'));tx.onabort=()=>reject(failure||tx.error||new Error('Salvamento da ação cancelado.'));
+      });
+    },
+    deleteAcao(id, expectedRowVersion) {
+      return new Promise((resolve,reject)=>{
+        const tx=db.transaction(['acoes'],'readwrite'),store=tx.objectStore('acoes'),req=store.get(id);let failure;
+        req.onsuccess=()=>{if(!req.result||req.result.rowVersion!==expectedRowVersion){failure=Object.assign(new Error('A ação foi alterada ou removida. Recarregue antes de excluir.'),{code:'ACAO_CONFLICT'});tx.abort();return;}store.delete(id);};
+        tx.oncomplete=()=>resolve();tx.onerror=()=>reject(failure||tx.error||new Error('Falha ao excluir ação.'));tx.onabort=()=>reject(failure||tx.error||new Error('Exclusão da ação cancelada.'));
+      });
+    },
     del: (s, id) => s === 'fotos' ? delPhoto(id) : w(st(s, 'readwrite').delete(id)),
     by: (s, idx, v) => w(st(s).index(idx).getAll(v)),
     async getSetting(k, def) { const r = await w(st('settings').get(k)); return r ? r.value : def; },
     setSetting: (k, value) => w(st('settings', 'readwrite').put({ key: k, value })),
     async delVistoria(id) {
       return new Promise((resolve,reject)=>{
-        const tx=db.transaction(['fotos','vistorias'],'readwrite'),fs=tx.objectStore('fotos'),req=fs.index('vistoriaId').getAll(id);
+        // Inclui snapshots para serializar esta exclusão com putAcao, que valida o vínculo na mesma faixa de stores.
+        const tx=db.transaction(['fotos','vistorias','snapshots','acoes'],'readwrite'),fs=tx.objectStore('fotos'),as=tx.objectStore('acoes'),req=fs.index('vistoriaId').getAll(id),ar=as.index('vistoriaId').getAll(id);
         req.onsuccess=()=>{for(const f of req.result)fs.delete(f.id);tx.objectStore('vistorias').delete(id);};
+        ar.onsuccess=()=>{for(const a of ar.result)as.delete(a.id);};
         tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error || new Error('Falha ao excluir vistoria.'));tx.onabort=()=>reject(tx.error || new Error('Exclusão da vistoria cancelada.'));
       });
     },
@@ -120,7 +168,7 @@ const DB = (() => {
       });
     },
     atomicImport(batch) {
-      const stores = ['obras','vistorias','fotos','snapshots','arquivosEmitidos','emissoes','settings'];
+      const stores = ['obras','vistorias','fotos','snapshots','arquivosEmitidos','emissoes','settings','acoes'];
       return new Promise((resolve, reject) => {
         const t = db.transaction(stores, 'readwrite');
         const result = { novos: 0, duplicados: 0, conflitos: [] };
@@ -151,11 +199,41 @@ const DB = (() => {
         const filesByEmission = new Map((batch.arquivosEmitidos || []).map(x=>[x.emissaoId,x]));
         const sameEmission = (a,b) => { const x={...a},y={...b}; delete x.estadoSnapshot;delete x.estadoArquivo;delete y.estadoSnapshot;delete y.estadoArquivo;return same(x,y); };
         const conflict = (store,x) => result.conflitos.push({store,id:x.id,acao:'mantido_local'});
+        const actionsBySnapshot=new Map();
+        for(const action of batch.acoes||[]){if(!actionsBySnapshot.has(action.snapshotId))actionsBySnapshot.set(action.snapshotId,[]);actionsBySnapshot.get(action.snapshotId).push(action);}
+        const actionsForSnapshot = snapshotId => actionsBySnapshot.get(snapshotId)||[];
+        const rejectedActionIds=new Set();
+        const rejectActionLink = action => {if(rejectedActionIds.has(action.id))return;rejectedActionIds.add(action.id);result.conflitos.push({store:'acoes',id:action.id,acao:'rejeitado_vinculo'});};
+        const rejectActionsForSnapshot = snapshotId => actionsForSnapshot(snapshotId).forEach(rejectActionLink);
+        const importedActionIds=new Set();
+        const importActionsForSnapshot = snapshotId => {
+          const incoming=snaps.get(snapshotId), actions=actionsForSnapshot(snapshotId);
+          if(!incoming){rejectActionsForSnapshot(snapshotId);return;}
+          const validActions=[];
+          for(const action of actions){
+            if(action.vistoriaId!==incoming.vistoriaId||!(incoming.conteudo?.constatacoes||[]).some(c=>c?.id===action.constatacaoId)){rejectActionLink(action);continue;}
+            try{validateAction(action);validActions.push(action);}catch{rejectActionLink(action);}
+          }
+          const req=t.objectStore('snapshots').get(snapshotId);
+          req.onsuccess=()=>{
+            const local=req.result;
+            const localFindings=new Set((local?.conteudo?.constatacoes||[]).map(c=>c?.id));
+            if(!local||local.hash!==incoming.hash||local.vistoriaId!==incoming.vistoriaId){rejectActionsForSnapshot(snapshotId);return;}
+            for(const action of validActions){
+              if(!localFindings.has(action.constatacaoId)){rejectActionLink(action);continue;}
+              if(importedActionIds.has(action.id)){result.duplicados++;continue;}
+              importedActionIds.add(action.id);
+              addOrCompare('acoes',action,'id');
+            }
+          };
+        };
+        const emissionSnapshotIds=new Set((batch.emissoes||[]).map(e=>e.snapshotId).filter(Boolean));
+        for(const action of batch.acoes||[])if(!emissionSnapshotIds.has(action.snapshotId))rejectActionLink(action);
         for (const em of batch.emissoes) {
           const er=t.objectStore('emissoes').get(em.id);
           er.onsuccess=()=>{
             const oldEm=er.result;
-            if(oldEm&&!sameEmission(oldEm,em)){conflict('emissoes',em);return;}
+            if(oldEm&&!sameEmission(oldEm,em)){conflict('emissoes',em);rejectActionsForSnapshot(em.snapshotId);return;}
             const sn=em.snapshotId&&snaps.get(em.snapshotId), ar=(em.arquivoId&&files.get(em.arquivoId))||filesByEmission.get(em.id);
             const verifyRef=(store,item,refId,expectedHash,hashKey,done)=>{
               const key=item?.id||refId;if(!key){done(null);return;}
@@ -163,11 +241,12 @@ const DB = (() => {
               req.onsuccess=()=>{const old=req.result;if(!old){done(item?{old:null}:null);return;}if(old[hashKey]===expectedHash){done({old,duplicate:true});return;}conflict(store,item||{id:key});done({error:true});};
             };
             verifyRef('snapshots',sn,em.snapshotId,em.snapshotHash,'hash',sres=>verifyRef('arquivosEmitidos',ar,em.arquivoId,em.arquivoSha256,'sha256',ares=>{
-              if(sres?.error||ares?.error){conflict('emissoes',em);return;}
+              if(sres?.error||ares?.error){conflict('emissoes',em);rejectActionsForSnapshot(em.snapshotId);return;}
               const ss=t.objectStore('snapshots'),fs=t.objectStore('arquivosEmitidos'),es=t.objectStore('emissoes');
               if(sn&&!sres?.old){ss.add(sn);result.novos++;}else if(sn&&sres?.duplicate)result.duplicados++;
               if(ar&&!ares?.old){fs.add(ar);result.novos++;}else if(ar&&ares?.duplicate)result.duplicados++;
               if(!oldEm){es.add(em);result.novos++;}else result.duplicados++;
+              if(sn)importActionsForSnapshot(sn.id);else rejectActionsForSnapshot(em.snapshotId);
             }));
           };
         }

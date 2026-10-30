@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 1.3.0 · 30/10/2026
+
+- Ações corretivas declaradas localmente por constatação de snapshot verificado, com função responsável, prazo, estado, data de conclusão e observação.
+- Store `acoes` no IndexedDB v3 com `rowVersion` e rejeição de gravação obsoleta; conflitos de importação preservam a cópia local. O controle guarda a versão atual, não um histórico append-only.
+- Painel mostra ações declaradas concluídas/abertas, vencimento e aging. Esses estados não são verificados; emissão de laudo não encerra ação.
+- Backup JSON v1 aceita a lista opcional `acoes` com validação de esquema e vínculo ao snapshot. Dados de função/observação podem ser sensíveis; backup permanece sem criptografia.
+- Emissões retidas de vistorias excluídas são omitidas do backup restaurável; a exportação avisa que snapshots/arquivos associados ficam somente no navegador e serão perdidos se os dados locais forem apagados.
+- Antes de atualizar, faça backup. O código 1.2.0 não abre o IndexedDB v3 (VersionError) e não aceita a lista `acoes` se ela estiver presente no backup. Nenhuma alteração de snapshot ocorre ao editar/excluir ação.
+
 ## 1.2.0 · 30/10/2026
 
 - Painel analítico local com janela de 12/24 meses ou histórico completo, período explícito e denominadores consistentes com a data congelada em cada snapshot verificável.

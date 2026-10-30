@@ -177,3 +177,10 @@ test('limite de 200 candidatos é determinístico e informa o total omitido',asy
   assert.equal(a.duplicateCandidates.length,200);assert.equal(a.duplicateCandidatesTotal,20100);assert.equal(a.duplicateCandidatesTruncated,true);
   assert.deepEqual(a.duplicateCandidates,b.duplicateCandidates);
 });
+
+test('declaração local continua associada pelo ID estável em nova revisão',()=>{
+  const vistoriaId=uid(),findingId=uid(),oldSnapshot={id:uid(),conteudo:{constatacoes:[{id:findingId,gravidade:'Alta'}]}},currentSnapshot={id:uid(),conteudo:{constatacoes:[{id:findingId,gravidade:'Alta'}]}};
+  const action={vistoriaId,constatacaoId:findingId,snapshotId:oldSnapshot.id,estado:'concluida',concluidaEm:1,criadoEm:1,prazo:'2026-10-29'};
+  const summary=Analytics.summarizeActions([{vistoriaId,snapshotId:currentSnapshot.id}],[oldSnapshot,currentSnapshot],[action],{asOf:'2026-10-30',now:40*86400000});
+  assert.deepEqual(summary,{completed:1,declared:1,active:0,cancelled:0,overdue:0,aging30:0,highCriticalWithoutAction:0,highCriticalTotal:1});
+});

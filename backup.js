@@ -11,7 +11,7 @@
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [0x50,0x4b,0x03,0x04]
   };
   const FIELDS = {
-    backup: ['app','v','appVersion','exportadoEm','seqs','obras','vistorias','emissoes','fotos','snapshots','arquivosEmitidos'],
+    backup: ['app','v','appVersion','exportadoEm','seqs','obras','vistorias','emissoes','fotos','snapshots','arquivosEmitidos','acoes'],
     obras: ['id','nome','cliente','endereco','contrato','art','criadoEm'],
     vistorias: ['id','obraId','local','tipo','data','hora','participantes','clima','objetivo','metodologia','documentos','descricao','constatacoes','conclusao','recomendacoes','status','nFotos','gps','criadoEm','updatedAt','seq','ano'],
     constatacoes: ['id','titulo','tipo','gravidade','ambiente','local','descricao','recomendacao','fotoIds'],
@@ -19,8 +19,9 @@
     fotos: ['id','vistoriaId','ts','lat','lon','acc','descricao','origem','w','h','stampLines','marks','notas','cortada','ajustada','cropBackup','data','baseData'],
     crop: ['blob','base','marks','notas','stampLines','w','h','cortada','ajustada'],
     snapshots: ['id','schema','schemaVersion','canonicalizacao','hashAlgoritmo','hash','criadoEm','appVersion','emissaoId','vistoriaId','obraId','tipo','formato','numero','rev','conteudo'],
-    artifacts: ['id','emissaoId','snapshotId','arquivo','mime','sha256','bytes','data']
-    ,mark: ['t','n','x1','y1','x2','y2','c'], note:['n','txt']
+    artifacts: ['id','emissaoId','snapshotId','arquivo','mime','sha256','bytes','data'],
+    acoes: ['id','constatacaoId','vistoriaId','snapshotId','responsavelFuncao','prazo','estado','concluidaEm','observacao','criadoEm','atualizadoEm','rowVersion'],
+    mark: ['t','n','x1','y1','x2','y2','c'], note:['n','txt']
   };
   const fail = m => { throw new Error(m); };
   function object(o, fields, label) {
@@ -81,9 +82,12 @@
     if (d.app !== 'cgu-vistorias' || d.v !== 1 || typeof d.appVersion !== 'string' || d.appVersion.length > 32) fail('Envelope v1 inválido');
     num(d.exportadoEm,'exportadoEm');
     for (const k of ['obras','vistorias','emissoes','fotos']) if (!Array.isArray(d[k]) || d[k].length > MAX_ITEMS) fail('Lista inválida: ' + k);
+    if(d.acoes!=null&&(!Array.isArray(d.acoes)||d.acoes.length>MAX_ITEMS))fail('Lista inválida: acoes');
     const maps = {}; for (const k of ['obras','vistorias','emissoes','fotos']) maps[k] = new Map();
     const checkRows = (k, schema) => { for (const x of d[k]) { object(x, schema, k); id(x.id,k+'.id'); if (maps[k].has(x.id)) fail('ID duplicado em '+k); maps[k].set(x.id,x); } };
     checkRows('obras',FIELDS.obras); checkRows('vistorias',FIELDS.vistorias); checkRows('emissoes',FIELDS.emissoes); checkRows('fotos',FIELDS.fotos);
+    const actionIds=new Set();
+    for(const a of d.acoes||[]){object(a,FIELDS.acoes,'acao');id(a.id,'acao.id');id(a.constatacaoId,'acao.constatacaoId');id(a.vistoriaId,'acao.vistoriaId');id(a.snapshotId,'acao.snapshotId');if(actionIds.has(a.id))fail('ID duplicado em acoes');actionIds.add(a.id);if(!maps.vistorias.has(a.vistoriaId))fail('Ação sem vistoria');str(a.responsavelFuncao,'acao.responsavelFuncao',120);if(!a.responsavelFuncao.trim())fail('Função responsável vazia');str(a.observacao,'acao.observacao',500);if(typeof a.prazo!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(a.prazo)||!Number.isFinite(Date.parse(a.prazo))||new Date(`${a.prazo}T00:00:00Z`).toISOString().slice(0,10)!==a.prazo)fail('Prazo de ação inválido');if(!['aberta','em-execucao','concluida','cancelada'].includes(a.estado))fail('Estado de ação inválido');if(a.estado==='concluida'?typeof a.concluidaEm!=='number'||!Number.isFinite(a.concluidaEm)||a.concluidaEm<0:a.concluidaEm!=null)fail('Conclusão incompatível com estado da ação');for(const k of ['criadoEm','atualizadoEm'])num(a[k],'acao.'+k);num(a.rowVersion,'acao.rowVersion',1,Number.MAX_SAFE_INTEGER);if(!Number.isInteger(a.rowVersion))fail('rowVersion inválido');}
     let decodedTotal=0; const photoPayload=new Map(),photoHashes=new Map();
     const checkMarks = (items,label) => { if(items==null)return; if(!Array.isArray(items)||items.length>1000)fail(label+' inválidas'); for(const m of items){object(m,FIELDS.mark,'mark');if(!['arr','rect','ell','num'].includes(m.t)||m.c!=null&&!['vermelho','amarelo','azul','branco','preto'].includes(m.c))fail(label+' inválidas');for(const k of ['x1','y1','x2','y2'])if(m[k]!=null)num(m[k],k,0,1);if(m.t==='num')num(m.n,'mark.n',1,9999);} };
     const checkNotes = (items,label) => { if(items==null)return; if(!Array.isArray(items)||items.length>1000)fail(label+' inválidas'); for(const n of items){object(n,FIELDS.note,'nota');num(n.n,'nota.n',1,9999);str(n.txt,'nota.txt',10000);} };
@@ -108,7 +112,8 @@
     for(const v of d.vistorias)for(const c of v.constatacoes||[])for(const fid of c.fotoIds||[])if(!maps.fotos.has(fid)||maps.fotos.get(fid).vistoriaId!==v.id)fail('Constatação referencia foto inexistente/outra vistoria');
     const snaps=d.snapshots||[], arts=d.arquivosEmitidos||[]; if(!Array.isArray(snaps)||snaps.length>5000||!Array.isArray(arts)||arts.length>5000)fail('Lista de snapshots/arquivos inválida');
     let snapTotal=0, artifactTotal=0; const snapMap=new Map();
-    for(const s of snaps){object(s,FIELDS.snapshots,'snapshot');if(!snapshotLib)fail('Validador de snapshot indisponível');const r=await snapshotLib.validar(s);if(!r.ok)fail('Snapshot inválido: '+r.erros.join('; '));snapTotal+=new TextEncoder().encode(snapshotLib.canonicalize(s)).length;if(snapTotal>MAX_SNAPSHOT_TOTAL)fail('Snapshots excedem teto agregado de 50 MiB');snapMap.set(s.id,s);for(const ev of s.conteudo.evidencias){const p=photoPayload.get(ev.id);if(!p||p.record.vistoriaId!==s.vistoriaId)fail('Evidência do snapshot ausente no backup');const sha=await snapshotLib.sha256(p.data);if(sha!==ev.sha256||p.data.length!==ev.bytes)fail('Hash/tamanho da foto diverge do snapshot');if(ev.baseSha256){if(!p.base||await snapshotLib.sha256(p.base)!==ev.baseSha256||p.base.length!==ev.baseBytes)fail('Hash/tamanho da foto original diverge do snapshot');}}}
+    for(const s of snaps){object(s,FIELDS.snapshots,'snapshot');if(snapMap.has(s.id))fail('Snapshot duplicado');if(!snapshotLib)fail('Validador de snapshot indisponível');const r=await snapshotLib.validar(s);if(!r.ok)fail('Snapshot inválido: '+r.erros.join('; '));snapTotal+=new TextEncoder().encode(snapshotLib.canonicalize(s)).length;if(snapTotal>MAX_SNAPSHOT_TOTAL)fail('Snapshots excedem teto agregado de 50 MiB');snapMap.set(s.id,s);for(const ev of s.conteudo.evidencias){const p=photoPayload.get(ev.id);if(!p||p.record.vistoriaId!==s.vistoriaId)fail('Evidência do snapshot ausente no backup');const sha=await snapshotLib.sha256(p.data);if(sha!==ev.sha256||p.data.length!==ev.bytes)fail('Hash/tamanho da foto diverge do snapshot');if(ev.baseSha256){if(!p.base||await snapshotLib.sha256(p.base)!==ev.baseSha256||p.base.length!==ev.baseBytes)fail('Hash/tamanho da foto original diverge do snapshot');}}}
+    for(const a of d.acoes||[]){const sn=snapMap.get(a.snapshotId);if(!sn||sn.vistoriaId!==a.vistoriaId||!sn.conteudo.constatacoes.some(c=>c.id===a.constatacaoId))fail('Ação sem constatação no snapshot associado');}
     const artifactIds=new Set();for(const a of arts){object(a,FIELDS.artifacts,'arquivoEmitido');id(a.id,'arquivo.id');id(a.emissaoId,'arquivo.emissaoId');id(a.snapshotId,'arquivo.snapshotId');if(artifactIds.has(a.id))fail('ID de arquivo duplicado');artifactIds.add(a.id);const em=maps.emissoes.get(a.emissaoId),sn=snapMap.get(a.snapshotId);if(!em)fail('Arquivo sem emissão');if(!sn||!em.snapshotId||em.snapshotId!==a.snapshotId||sn.emissaoId!==a.emissaoId||em.arquivoId&&em.arquivoId!==a.id)fail('Arquivo sem snapshot/emissão correspondente');const raw=artifactData(a.data,a.mime,a.bytes);artifactTotal+=raw.length;if(artifactTotal>MAX_BACKUP_BYTES)fail('Arquivos emitidos excedem teto agregado');if(!/^[0-9a-f]{64}$/.test(a.sha256)||typeof crypto==='undefined'||!crypto.subtle)fail('Digest inválido/indisponível');const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',raw))].map(x=>x.toString(16).padStart(2,'0')).join('');if(digest!==a.sha256||!em.arquivoSha256||digest!==em.arquivoSha256)fail('SHA-256 do arquivo não confere');const verified=await snapshotLib.verificarArquivo(em,sn,{...a,blob:new Blob([raw],{type:a.mime})});if(verified.estado!=='verificado')fail('Arquivo emitido divergente: '+verified.detalhe);}
     decodedTotal+=artifactTotal;if(decodedTotal>MAX_BINARY_TOTAL)fail('Bytes binários decodificados excedem o limite agregado de 400 MiB');
     for(const s of snaps){const e=maps.emissoes.get(s.emissaoId);if(!e)fail('Snapshot sem emissão');if(e.snapshotId!==s.id||e.snapshotHash!==s.hash||e.vistoriaId!==s.vistoriaId||e.obraId!==s.obraId)fail('Snapshot não corresponde à emissão');}
@@ -116,6 +121,7 @@
     return { data:d, decodedTotal, photoHashes, snapshotIds:new Set(snaps.map(s=>s.id)), artifactIds:new Set(arts.map(a=>a.id)) };
   }
   async function photoJson(f, b64) { const {blob,base,cropBackup,contentSha256,...rest}=f; const c=cropBackup?{...cropBackup,blob:cropBackup.blob?await b64(cropBackup.blob):undefined,base:cropBackup.base?await b64(cropBackup.base):undefined}:undefined; return {...rest,data:await b64(blob),...(base?{baseData:await b64(base)}:{}),...(c?{cropBackup:c}:{})}; }
+  const selectEmissionsForVistorias = (emissoes, vistoriaIds) => (Array.isArray(emissoes)?emissoes:[]).filter(e=>vistoriaIds instanceof Set&&vistoriaIds.has(e?.vistoriaId));
   function decodePhoto(f, BlobCtor=Blob) {
     const {data,baseData,cropBackup,...rest}=f;
     const decode=s=>{const x=dataUrl(s);return new BlobCtor([x.bytes],{type:x.mime});};
@@ -124,6 +130,6 @@
   }
   const csvCell = v => { const s=String(v??''); return '"'+((/^[\t\r ]*[=+\-@]/.test(s)?"'":'')+s).replace(/"/g,'""')+'"'; };
   const escapeHtml = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  root.Backup = Object.freeze({ validate, dataUrl, artifactData, photoJson, decodePhoto, photoFingerprint, classifyPhotoCollision:(localDigest,incomingDigest)=>localDigest&&localDigest===incomingDigest?'duplicata':'conflito', csvCell, escapeHtml, limits:{MAX_BACKUP_BYTES,MAX_IMAGE_BYTES,MAX_IMAGES_TOTAL,MAX_ARTIFACT_BYTES,MAX_SNAPSHOT_TOTAL} });
+  root.Backup = Object.freeze({ validate, dataUrl, artifactData, photoJson, decodePhoto, photoFingerprint, selectEmissionsForVistorias, classifyPhotoCollision:(localDigest,incomingDigest)=>localDigest&&localDigest===incomingDigest?'duplicata':'conflito', csvCell, escapeHtml, limits:{MAX_BACKUP_BYTES,MAX_IMAGE_BYTES,MAX_IMAGES_TOTAL,MAX_ARTIFACT_BYTES,MAX_SNAPSHOT_TOTAL} });
   if(typeof module!=='undefined'&&module.exports)module.exports=root.Backup;
 })(typeof globalThis!=='undefined'?globalThis:this);

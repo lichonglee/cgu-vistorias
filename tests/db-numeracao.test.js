@@ -63,7 +63,7 @@ test('registrarEmissao é atômico (snapshot, arquivo, emissão) e snapshot/arqu
   await assert.rejects(() => d.addSnapshot(sn));
   assert.equal(typeof d.delSnapshot, 'undefined');
 });
-test('migração IndexedDB v1 → v2 preserva obra, vistoria, foto, emissão legada e settings; cria stores novas', { skip }, async () => {
+test('migração IndexedDB v1 → v3 preserva obra, vistoria, foto, emissão legada e settings; cria stores novas', { skip }, async () => {
   const idb = novoIdb();
   await new Promise((res, rej) => {                        // banco no formato da v1.0.6
     const r = idb.open(nomeBanco, 1);

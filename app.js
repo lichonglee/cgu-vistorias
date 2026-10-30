@@ -385,7 +385,7 @@ async function vObra(view, id) {
   bindGo(view);
   $('#eo').onclick = () => obraSheet(o);
   $('#xo').onclick = () => exportBackup(o.id);
-  $('#do').onclick = async () => { if (await confirmar(`Excluir o edifício "${o.nome}" e suas vistorias e fotos locais? Emissões, snapshots e arquivos emitidos podem permanecer retidos conforme a política institucional ainda pendente. Não há como desfazer.`)) { await DB.delObra(o.id); location.hash = '#/'; } };
+  $('#do').onclick = async () => { if (await confirmar(`Excluir o edifício "${o.nome}", suas vistorias, fotos e ações declaradas locais? Emissões, snapshots e arquivos emitidos podem permanecer retidos conforme a política institucional ainda pendente. Não há como desfazer.`)) { await DB.delObra(o.id); location.hash = '#/'; } };
   $('#nv').onclick = async () => {
     const v = { id: DB.uid(), obraId: o.id, local: '', tipo: TIPOS[0], data: hoje(), hora: agora(), participantes: S.usuario || '', clima: '', objetivo: '', metodologia: METOD, documentos: '', descricao: '', constatacoes: [], conclusao: '', recomendacoes: '', status: 'rascunho', nFotos: 0, gps: null, criadoEm: Date.now(), updatedAt: Date.now() };
     await DB.put('vistorias', v); tab = 'dados'; location.hash = '#/vistoria/' + v.id;
@@ -417,7 +417,7 @@ async function vVistoria(view, id) {
       <button class="btn bad sm" id="dv">Excluir vistoria</button>`;
     bindFields(tb, v, async (p, val) => { await save(p, val); if (p === 'local') setTitle(v.local || 'Nova vistoria', '#/obra/' + o.id); });
     $('#gps').onclick = async () => { toast('Obtendo localização…'); const p = await getPos(); if (!p) return toast('Não foi possível obter o GPS. Verifique a permissão.', 4000); v.gps = p; await patchV(v.id, 'gps', p); route(); };
-    $('#dv').onclick = async () => { if (await confirmar('Excluir esta vistoria e suas fotos locais? Emissões, snapshots e arquivos emitidos podem permanecer retidos conforme a política institucional ainda pendente. Não há como desfazer.')) { await DB.delVistoria(v.id); location.hash = '#/obra/' + o.id; } };
+    $('#dv').onclick = async () => { if (await confirmar('Excluir esta vistoria, suas fotos e ações declaradas locais? Emissões, snapshots e arquivos emitidos podem permanecer retidos conforme a política institucional ainda pendente. Não há como desfazer.')) { await DB.delVistoria(v.id); location.hash = '#/obra/' + o.id; } };
   }
   if (tab === 'fotos') {
     tb.innerHTML = `<div class="row"><button class="btn grow" id="cam">${CGU.icon("camera")} Tirar foto</button><button class="btn sec grow" id="gal">${CGU.icon("image")} Da galeria</button></div>
@@ -429,10 +429,12 @@ async function vVistoria(view, id) {
   }
   if (tab === 'const') {
     const C = v.constatacoes || [];
-    tb.innerHTML = `<button class="btn block" id="nc">+ Nova constatação</button><p class="mut small">Registre cada achado com sua gravidade, recomendação e as fotos que o comprovam.</p>
-      ${C.map((c, i) => `<div class="card tap" data-c="${esc(c.id)}"><div class="row sp"><b>${pad(i + 1)}. ${esc(c.titulo || 'Sem título')}</b><span class="chip ${esc(gravCls(c.gravidade))}">${esc(c.gravidade || '—')}</span></div><div class="mut small">${esc([c.ambiente, c.local].filter(Boolean).join(' · '))}${(c.fotoIds || []).length ? ' · ' + c.fotoIds.length + ' foto(s)' : ''}</div></div>`).join('') || '<div class="empty">Nenhuma constatação.</div>'}`;
+    const actionRows = await DB.by('acoes','vistoriaId',v.id);
+    tb.innerHTML = `<button class="btn block" id="nc">+ Nova constatação</button><p class="mut small">Registre cada achado com sua gravidade, recomendação e as fotos que o comprovam. Ações abaixo são declarações locais e não são verificadas.</p>
+      ${C.map((c, i) => { const count=actionRows.filter(a=>a.constatacaoId===c.id).length; return `<div class="card tap" data-c="${esc(c.id)}"><div class="row sp"><b>${pad(i + 1)}. ${esc(c.titulo || 'Sem título')}</b><span class="chip ${esc(gravCls(c.gravidade))}">${esc(c.gravidade || '—')}</span></div><div class="mut small">${esc([c.ambiente, c.local].filter(Boolean).join(' · '))}${(c.fotoIds || []).length ? ' · ' + c.fotoIds.length + ' foto(s)' : ''}</div><div class="row" style="margin-top:8px"><button class="btn sec sm" data-actions="${esc(c.id)}">Ações declaradas (${count})</button></div></div>`; }).join('') || '<div class="empty">Nenhuma constatação.</div>'}`;
     $('#nc').onclick = () => constSheet(v, fotos);
     tb.querySelectorAll('[data-c]').forEach(e => e.onclick = () => constSheet(v, fotos, v.constatacoes.find(c => c.id === e.dataset.c)));
+    tb.querySelectorAll('[data-actions]').forEach(e => e.onclick = event => { event.stopPropagation(); const c=C.find(x=>x.id===e.dataset.actions); if(c) actionsSheet(v,c); });
   }
   if (tab === 'concl') {
     tb.innerHTML = `<div class="card">${fld('Conclusão / parecer técnico', 'conclusao', v, { area: 1, rows: 6 })}${fld('Recomendações (uma por linha)', 'recomendacoes', v, { area: 1, rows: 6 })}</div>`;
@@ -456,7 +458,46 @@ function constSheet(v, fotos, c) {
   el.querySelectorAll('[data-id]').forEach(p => p.onclick = () => { const id = p.dataset.id; c.fotoIds = c.fotoIds.includes(id) ? c.fotoIds.filter(x => x !== id) : [...c.fotoIds, id]; p.classList.toggle('sel'); });
   el.querySelector('#x').onclick = closeModal;
   el.querySelector('#ok').onclick = async () => { if (!c.titulo.trim()) return toast('Informe o título'); v.constatacoes = v.constatacoes || []; if (novo) v.constatacoes.push(c); await patchV(v.id, 'constatacoes', v.constatacoes); closeModal(); route(); };
-  const d = el.querySelector('#dl'); if (d) d.onclick = async () => { if (!await confirmar('Excluir esta constatação?')) return; v.constatacoes = v.constatacoes.filter(x => x.id !== c.id); await patchV(v.id, 'constatacoes', v.constatacoes); closeModal(); route(); };
+  const d = el.querySelector('#dl'); if (d) d.onclick = async () => { if ((await DB.by('acoes','constatacaoId',c.id)).length) return toast('Exclua as ações declaradas vinculadas antes de excluir a constatação.'); if (!await confirmar('Excluir esta constatação?')) return; v.constatacoes = v.constatacoes.filter(x => x.id !== c.id); await patchV(v.id, 'constatacoes', v.constatacoes); closeModal(); route(); };
+}
+
+async function verifiedActionSnapshot(v,c) {
+  const emissions=(await DB.by('emissoes','vistoriaId',v.id)).slice().sort((a,b)=>(Number(b.rev)||0)-(Number(a.rev)||0)||(Number(b.data)||0)-(Number(a.data)||0)||(String(a.tipo)<String(b.tipo)?-1:String(a.tipo)>String(b.tipo)?1:0)||(String(a.formato)<String(b.formato)?-1:String(a.formato)>String(b.formato)?1:0)||(String(a.id)<String(b.id)?-1:String(a.id)>String(b.id)?1:0));
+  if(!emissions.length)return null;
+  const latest=emissions[0],rev=Number(latest.rev)||0,emittedAt=Number(latest.data)||0,tied=emissions.filter(e=>(Number(e.rev)||0)===rev&&(Number(e.data)||0)===emittedAt),checked=[];
+  for(const emission of tied){const snapshot=emission.snapshotId?await DB.get('snapshots',emission.snapshotId):null;let result;try{result=await SnapshotLib.verificarEmissao(emission,snapshot);}catch{result={estado:'divergente'};}checked.push({snapshot,result});}
+  if(!checked.length||checked.some(x=>x.result.estado!=='verificado'||!x.snapshot?.conteudo))return null;
+  const projection=x=>SnapshotLib.canonicalize({obra:x.snapshot.conteudo.obra,vistoria:x.snapshot.conteudo.vistoria,constatacoes:x.snapshot.conteudo.constatacoes,evidencias:x.snapshot.conteudo.evidencias});
+  if(checked.some(x=>projection(x)!==projection(checked[0])))return null;
+  const snapshot=checked[0].snapshot;
+  return snapshot.conteudo.constatacoes.some(x=>x.id===c.id)?snapshot:null;
+}
+async function actionsSheet(v,c) {
+  const actions=(await DB.by('acoes','constatacaoId',c.id)).filter(a=>a.vistoriaId===v.id).sort((a,b)=>(Number(b.atualizadoEm)||0)-(Number(a.atualizadoEm)||0)||(a.id<b.id?-1:a.id>b.id?1:0));
+  const snapshot=await verifiedActionSnapshot(v,c);
+  const el=modal(`<h2>Ações declaradas</h2><p><b>${esc(c.titulo||'Constatação')}</b></p><div class="warnbox">Declarações locais do usuário; não verificadas. Emitir um laudo não conclui nem encerra uma ação.</div>
+    ${actions.length?`<ul class="small">${actions.map(a=>`<li><b>${esc(a.estado)}</b> · função: ${esc(a.responsavelFuncao)} · prazo ${esc(a.prazo)} · ${esc(a.observacao||'Sem observação')} <button class="btn sec sm" data-edit-action="${esc(a.id)}">Editar</button></li>`).join('')}</ul>`:'<p class="mut small">Nenhuma ação declarada para esta constatação.</p>'}
+    ${snapshot?'<button class="btn block" id="new-action">+ Declarar ação neste snapshot</button>':'<p class="mut small">Para declarar ação, emita a constatação em um snapshot verificável. Ações não alteram snapshots existentes.</p>'}
+    <button class="btn ghost block" id="close-actions" style="margin-top:8px">Fechar</button>`);
+  el.querySelector('#close-actions').onclick=()=>{closeModal();route();};
+  const create=el.querySelector('#new-action');if(create)create.onclick=()=>actionForm(v,c,snapshot,null);
+  el.querySelectorAll('[data-edit-action]').forEach(button=>button.onclick=()=>{const action=actions.find(a=>a.id===button.dataset.editAction);if(action)actionForm(v,c,{id:action.snapshotId},action);});
+}
+function actionForm(v,c,snapshot,existing) {
+  const el=modal(`<h2>${existing?'Editar ação declarada':'Nova ação declarada'}</h2><p class="warnbox">Ação local não verificada e independente do snapshot emitido. Responsável é informado por função, sem autenticação.</p>
+    <label>Função responsável *</label><input id="action-owner" maxlength="120" value="${esc(existing?.responsavelFuncao||'')}" placeholder="Ex.: manutenção predial">
+    <label>Prazo *</label><input id="action-deadline" type="date" value="${esc(existing?.prazo||'')}">
+    <label>Estado declarado</label><select id="action-state">${[['aberta','Aberta'],['em-execucao','Em execução'],['concluida','Concluída'],['cancelada','Cancelada']].map(([value,label])=>`<option value="${value}" ${existing?.estado===value?'selected':''}>${label}</option>`).join('')}</select>
+    <label>Observação (máximo 500 caracteres)</label><textarea id="action-note" maxlength="500" rows="3">${esc(existing?.observacao||'')}</textarea><p class="mut small">Não inclua nomes, documentos pessoais ou dados sensíveis. A observação fica no aparelho e no backup local.</p>
+    <div class="row wrap"><button class="btn grow" id="save-action">Salvar ação</button>${existing?'<button class="btn bad sm" id="delete-action">Excluir ação</button>':''}<button class="btn ghost sm" id="cancel-action">Cancelar</button></div>`);
+  el.querySelector('#cancel-action').onclick=()=>{closeModal();route();};
+  el.querySelector('#save-action').onclick=async()=>{
+    const estado=el.querySelector('#action-state').value,concluidaEm=estado==='concluida'?(existing?.concluidaEm||Date.now()):null;
+    const action={id:existing?.id||DB.uid(),constatacaoId:c.id,vistoriaId:v.id,snapshotId:snapshot.id,responsavelFuncao:el.querySelector('#action-owner').value.trim(),prazo:el.querySelector('#action-deadline').value,estado,concluidaEm,observacao:el.querySelector('#action-note').value.trim()};
+    try{await DB.putAcao(action,existing?.rowVersion||0);toast('Ação declarada salva; permanece não verificada.');closeModal();route();}
+    catch(error){if(error.code==='ACAO_CONFLICT'&&existing){const latest=await DB.get('acoes',existing.id);if(latest){existing.rowVersion=latest.rowVersion;toast(`Ação alterada em outra tela. Versão atual: ${latest.estado}; função ${latest.responsavelFuncao}; prazo ${latest.prazo}; observação: ${(latest.observacao||'—').slice(0,120)}. Seu rascunho está preservado; revise e salve novamente para substituir.`,8000);}else if(await confirmar('A ação foi removida em outra tela. Deseja registrar seus campos preservados como uma nova ação?')){existing.id=DB.uid();existing.rowVersion=0;existing.criadoEm=null;existing.atualizadoEm=null;toast('Rascunho preservado como nova ação. Revise e pressione Salvar novamente.',6000);}else toast('A ação foi removida em outra tela. Seus campos permanecem no formulário.',6000);}else toast(error.message,5000);}
+  };
+  const remove=el.querySelector('#delete-action');if(remove)remove.onclick=async()=>{if(!await confirmar('Excluir esta declaração local? O snapshot emitido não será alterado.'))return;try{await DB.deleteAcao(existing.id,existing.rowVersion);toast('Ação removida. O snapshot permanece intacto.');closeModal();route();}catch(error){toast(error.message,5000);}};
 }
 
 /* ---------- EMISSÃO ---------- */
@@ -551,7 +592,7 @@ async function vPainel(view) {
     $('#go').onclick = async () => { if (await sha($('#pin').value) === S.pinHash) { sessionStorage.setItem('cgu-adm', S.pinHash); route(); } else toast('PIN incorreto'); };
     $('#pin').onkeydown = e => { if (e.key === 'Enter') $('#go').click(); }; return;
   }
-  const [obras, vs, ems, snaps] = await Promise.all([DB.all('obras'), DB.all('vistorias'), DB.all('emissoes'), DB.all('snapshots')]);
+  const [obras, vs, ems, snaps, acoes] = await Promise.all([DB.all('obras'), DB.all('vistorias'), DB.all('emissoes'), DB.all('snapshots'), DB.all('acoes')]);
   const taxonomia = typeof Taxonomia !== 'undefined' ? Taxonomia : null;
   const sistemaPorTipo = Object.fromEntries((taxonomia?.TIPOS || []).map(item => [item.label, item.group]));
   const grupoPorAmbiente = Object.fromEntries((taxonomia?.AMBIENTES || []).map(item => [item.label, item.group]));
@@ -566,6 +607,8 @@ async function vPainel(view) {
   const ids = new Set(F.map(v => v.id)); const E = ems.filter(e => ids.has(e.vistoriaId)).sort((a, b) => b.data - a.data);
   const vm = Object.fromEntries(vs.map(v => [v.id, v]));
   const nFotos = F.reduce((a, v) => a + (v.nFotos || 0), 0);
+  let actionSummary=null;
+  try{if(resumo&&typeof Analytics?.summarizeActions==='function')actionSummary=Analytics.summarizeActions(resumo.migrationRecords,snaps,acoes,{asOf:hoje()});}catch(error){console.error('Resumo de ações locais indisponível:',error);}
   const grupos = {};
   F.forEach(v => { const k = filtro.grupo === 'obra' ? (om[v.obraId]?.nome || '—') : (v.local || 'Sem local'); (grupos[k] ||= []).push(v); });
   const analyticsSection = !resumo ? '<section class="card warnbox"><b>Indicadores locais indisponíveis.</b> A lista de vistorias continua disponível; atualize o aplicativo ou tente novamente.</section>' : `
@@ -582,11 +625,11 @@ async function vPainel(view) {
         <div><h3>Constatações por macroambiente (catálogo da interface)</h3>${listaDimensao(resumo.dimensions.environmentGroup)}<h3>Vistorias por mês</h3>${listaDimensao(resumo.dimensions.month)}</div></div>
       <div class="grid2"><div><h3>Lacunas cadastrais no inventário local</h3>${resumo.dataGaps.length ? `<ul class="small">${resumo.dataGaps.map(g => `<li>${esc(g.field)}: <b>${g.count}</b> · IDs: ${g.ids.map(id => `<code title="${esc(id)}">${esc(id.length > 15 ? id.slice(0, 8) + '…' + id.slice(-4) : id)}</code>`).join(', ')}${g.truncated ? ' · lista limitada aos 50 primeiros IDs' : ''}</li>`).join('')}</ul>` : '<p class="mut small">Nenhuma lacuna nos campos avaliados.</p>'}</div><div><h3>Candidatos a duplicata</h3>${!resumo.duplicateCandidatesAvailable ? '<p class="mut small">Indisponível neste contexto seguro; os demais indicadores seguem disponíveis.</p>' : resumo.duplicateCandidates.length ? `<p class="mut small">${resumo.duplicateCandidatesTotal} par(es); lista limitada a 200.</p><ul class="small">${resumo.duplicateCandidates.map(d => `<li><code title="${esc(d.vistoriaIdA)}">${esc(d.vistoriaIdA.slice(0, 8))}…</code> ↔ <code title="${esc(d.vistoriaIdB)}">${esc(d.vistoriaIdB.slice(0, 8))}…</code> · aviso, sem mescla</li>`).join('')}</ul>` : '<p class="mut small">Nenhum par candidato nesta janela.</p>'}</div></div>
       <div class="card"><b>Exportação local restrita</b><p class="mut small">Baixa apenas por ação explícita. O agregado não inclui texto livre, nomes, GPS ou fotos. O manifesto pode incluir IDs somente se a opção abaixo for marcada. Não compartilhe nem centralize sem aprovação de privacidade.</p><label><input type="checkbox" id="analytics-include-ids"> Incluir IDs estáveis no manifesto (desativado por padrão)</label><div class="row wrap"><button class="btn sec sm" id="analytics-export-aggregate">Baixar agregado analítico</button><button class="btn sec sm" id="analytics-export-manifest">Baixar manifesto de migração</button></div></div>
-      <div class="warnbox"><b>Não calculado:</b> recorrência (não há vínculo estruturado entre achados), saneamento (não há ações corretivas estruturadas) e risco (rubrica de probabilidade/impacto não aprovada). ${resumo.counts.periodUnverifiedLatestEmissions} vistoria(s) da janela com emissão mais recente sem snapshot verificável ou com snapshots empatados divergentes foram excluídas das dimensões. ${resumo.stale.inspectionsEditedAfterEmission} vistoria(s) foram editadas após a emissão considerada; os indicadores refletem o conteúdo congelado na emissão.</div>
+      <div class="warnbox"><b>Não calculado:</b> recorrência (não há vínculo estruturado entre achados), saneamento verificado (as ações são declarações locais, sem comprovação de execução) e risco (rubrica de probabilidade/impacto não aprovada). ${resumo.counts.periodUnverifiedLatestEmissions} vistoria(s) da janela com emissão mais recente sem snapshot verificável ou com snapshots empatados divergentes foram excluídas das dimensões. ${resumo.stale.inspectionsEditedAfterEmission} vistoria(s) foram editadas após a emissão considerada; os indicadores refletem o conteúdo congelado na emissão.</div>
     </section>`;
   view.innerHTML = `
     <div class="kpis"><div class="kpi"><b>${new Set(F.map(v => v.obraId)).size}</b><span>EDIFÍCIOS</span></div><div class="kpi"><b>${F.length}</b><span>VISTORIAS</span></div><div class="kpi"><b>${F.filter(v => v.status === 'emitido').length}</b><span>EMITIDAS</span></div><div class="kpi"><b>${F.filter(v => v.status !== 'emitido').length}</b><span>EM RASCUNHO</span></div><div class="kpi"><b>${nFotos}</b><span>FOTOS</span></div><div class="kpi"><b>${E.length}</b><span>LINHAS DE EMISSÃO</span></div></div>
-${analyticsSection}    <div class="card"><div class="grid2"><div><label style="margin-top:0">Edifício</label><select data-f="obra"><option value="">Todos</option>${obras.map(o => `<option value="${esc(o.id)}" ${filtro.obra === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></div>
+    ${analyticsSection}${!actionSummary ? '<section class="card warnbox"><b>Indicadores de ações indisponíveis.</b> A lista de vistorias continua disponível.</section>' : `<section class="card"><h3>Ações declaradas ligadas às constatações selecionadas verificáveis no período (${esc(resumo.period.label)})</h3><div class="kpi"><span>DECLARADAS COMO CONCLUÍDAS / DECLARADAS (CANCELADAS EXCLUÍDAS)</span><b>${actionSummary.completed} / ${actionSummary.declared}</b><span>${actionSummary.overdue} vencidas · ${actionSummary.aging30} abertas há mais de 30 dias · ${actionSummary.cancelled} canceladas</span></div><p class="mut small">Declarações locais, não verificadas; uma ação continua vinculada à constatação pelo ID estável mesmo quando ela aparece em nova revisão. Ações de constatações fora do período ou não selecionadas ficam fora. Emissão não confirma execução nem encerra ação. Não é indicador institucional nem de risco.</p><div class="kpi"><span>CONSTATAÇÕES ALTAS/CRÍTICAS SEM AÇÃO DECLARADA / TOTAL ELEGÍVEL</span><b>${actionSummary.highCriticalWithoutAction} / ${actionSummary.highCriticalTotal}</b></div></section>`}<div class="card"><div class="grid2"><div><label style="margin-top:0">Edifício</label><select data-f="obra"><option value="">Todos</option>${obras.map(o => `<option value="${esc(o.id)}" ${filtro.obra === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></div>
       <div><label style="margin-top:0">Situação</label><select data-f="status"><option value="">Todas</option><option value="rascunho" ${filtro.status === 'rascunho' ? 'selected' : ''}>Rascunho</option><option value="emitido" ${filtro.status === 'emitido' ? 'selected' : ''}>Emitido</option></select></div>
       <div><label>De</label><input type="date" data-f="de" value="${esc(filtro.de)}"></div><div><label>Até</label><input type="date" data-f="ate" value="${esc(filtro.ate)}"></div></div>
       <label>Buscar local ou edifício</label><input data-f="q" type="search" value="${esc(filtro.q)}"></div>
@@ -644,17 +687,18 @@ async function vAjustes(view) {
 }
 const blobToData = b => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); });
 async function exportBackup(obraId) {
-  if (!await confirmar('Este backup contém dados de vistoria, fotos, GPS e dados profissionais (como CREA). O arquivo JSON não é criptografado; guarde-o somente em local autorizado. Continuar?')) return;
+  if (!await confirmar('Este backup contém dados de vistoria, fotos, GPS, dados profissionais (como CREA) e ações locais declaradas, incluindo função responsável e observações. O arquivo JSON não é criptografado; guarde-o somente em local autorizado. Continuar?')) return;
   toast('Preparando backup…');
   let obras = await DB.all('obras'), vs = await DB.all('vistorias'), ems = await DB.all('emissoes');
   if (obraId) { obras = obras.filter(o => o.id === obraId); vs = vs.filter(v => v.obraId === obraId); ems = ems.filter(e => e.obraId === obraId); }
-  const vids = new Set(vs.map(v => v.id)), eids = new Set(ems.map(e => e.id)); const seqs = {};
+  const vids = new Set(vs.map(v => v.id)),allEmissionCount=ems.length; ems=Backup.selectEmissionsForVistorias(ems,vids); const omittedEmissions=allEmissionCount-ems.length; if(omittedEmissions&&!await confirmar(`${omittedEmissions} emissão(ões) de vistorias excluídas ficarão fora deste backup; snapshots e arquivos associados também não serão exportados e permanecem somente no navegador. Se limpar os dados do navegador, eles serão perdidos. Prosseguir?`))return; const eids = new Set(ems.map(e => e.id)); const seqs = {};
   for (const k of [new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1]) seqs[k] = await DB.getSetting('seq-' + k, 0);
   const fotos=[]; for(const f of await DB.all('fotos')) if(vids.has(f.vistoriaId)) fotos.push(await Backup.photoJson(f,blobToData));
   const snapshots=(await DB.all('snapshots')).filter(x=>eids.has(x.emissaoId));
   const arquivos=[]; for(const a of await DB.all('arquivosEmitidos')) if(eids.has(a.emissaoId)){const {blob,...rest}=a;arquivos.push({...rest,data:await blobToData(blob)});}
+  const acoes=(await DB.all('acoes')).filter(x=>vids.has(x.vistoriaId));
   const d={app:'cgu-vistorias',v:1,appVersion:CGU.version,exportadoEm:Date.now(),seqs,obras,vistorias:vs,emissoes:ems,fotos};
-  if(snapshots.length)d.snapshots=snapshots;if(arquivos.length)d.arquivosEmitidos=arquivos;
+  if(snapshots.length)d.snapshots=snapshots;if(arquivos.length)d.arquivosEmitidos=arquivos;if(acoes.length)d.acoes=acoes;
   const blob=new Blob([JSON.stringify(d)],{type:'application/json'});
   if(blob.size>Backup.limits.MAX_BACKUP_BYTES) return toast('Backup excede o limite de 512 MiB.',5000);
   baixar(blob, `CGU-Vistorias_backup_${hoje()}.json`);

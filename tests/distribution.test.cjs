@@ -25,8 +25,12 @@ test('a distribuição usa X.Y.Z consistente no produto, HTML e manifesto de fer
  // Atualizar esta declaração quando as capturas forem refeitas para uma versão posterior.
  assert.ok(read('LEIA-ME.md').includes('capturas de tela ainda são da versão 1.0.x'));
  assert.ok(manual.includes('O bloco analítico usa snapshots verificáveis'));
- assert.ok(manual.includes('GPS, snapshots e arquivos PDF/DOCX emitidos'));
- assert.ok(manual.includes('aplicativo 1.0.6 não consegue abrir esse banco'));
+ assert.ok(manual.includes('GPS, snapshots, arquivos PDF/DOCX emitidos e ações declaradas'));
+ assert.ok(manual.includes('esquema v3'));
+ assert.ok(manual.includes('Ações declaradas'));
+ assert.ok(manual.includes('v1.2.0 também não aceita a lista opcional acoes'));
+ assert.match(read('db.js'),/NAME = 'cgu-vistorias', VER = 3/);
+ assert.ok(read('CHANGELOG.md').includes('rowVersion'));
  assert.ok(manual.includes('responsável técnico/CREA e usuário) são incluídos nos snapshots'));
  assert.ok(manual.includes('Baixar manual em PDF (versão 1.0.x; desatualizado)'));
  assert.ok(read('CHANGELOG.md').startsWith('# Histórico de versões\n\n## '+identity.version+' · '));
