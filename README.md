@@ -1,4 +1,4 @@
-# CGU Vistorias · v1.9.0
+# CGU Vistorias · v1.10.0
 
 Aplicação web instalável (PWA) para organizar vistorias, registrar evidências e gerar relatórios em Word e PDF com a identidade visual da Controladoria-Geral da União.
 

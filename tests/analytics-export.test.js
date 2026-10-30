@@ -3,7 +3,8 @@ const assert=require('node:assert/strict');
 const SnapshotLib=require('../emission-snapshot.js');
 const Export=require('../analytics-export.js');
 const Analytics=require('../analytics.js');
-const sample=()=>({schema:'cgu-local-analytics-v1',period:{asOf:'2026-10-30',windowMonths:12,from:'2025-11-01',to:'2026-10-30'},taxonomyVersion:'cgu-app-taxonomia-1',counts:{verifiedFindings:2,periodInspections:1},kpis:{severeDensity:{numerator:2,denominator:1,meaning:'private description'},risk:{calculable:false,reason:'private text'}},dimensions:{severity:[{label:'Alta',count:2}],hostile:[{label:'<img onerror=1>',count:0}]},migrationRecords:[{vistoriaId:'11111111-1111-4111-8111-111111111111',snapshotId:'22222222-2222-4222-8222-222222222222',snapshotHash:'a'.repeat(64),emissaoId:'33333333-3333-4333-8333-333333333333',tipo:'tecnico',rev:1,completeness:{data:true,tipo:true,ambiente:true,gravidade:false}}],secret:'BUILDING NAME GPS USER DESCRIPTION'});
+const Registry=require('../indicator-registry.js');
+const sample=()=>({schema:'cgu-local-analytics-v1',ruleVersion:Registry.RULE_VERSION,period:{asOf:'2026-10-30',windowMonths:12,from:'2025-11-01',to:'2026-10-30'},taxonomyVersion:'cgu-app-taxonomia-1',counts:{verifiedFindings:2,periodInspections:1},kpis:{severeDensity:{numerator:2,denominator:1,meaning:'private description'},risk:{calculable:false,reason:'private text'}},dimensions:{severity:[{label:'Alta',count:2}],hostile:[{label:'<img onerror=1>',count:0}]},migrationRecords:[{vistoriaId:'11111111-1111-4111-8111-111111111111',snapshotId:'22222222-2222-4222-8222-222222222222',snapshotHash:'a'.repeat(64),emissaoId:'33333333-3333-4333-8333-333333333333',tipo:'tecnico',rev:1,completeness:{data:true,tipo:true,ambiente:true,gravidade:false}}],secret:'BUILDING NAME GPS USER DESCRIPTION'});
 
 async function verify(sealed){
   const {sha256,...payload}=sealed.object;
@@ -32,7 +33,7 @@ test('agregado exporta apenas contagens do vínculo de recorrência, nunca o ID 
   input.kpis.recurrence={numerator:1,denominator:2,meaning:'private'};
   input.secret=target;
   const result=await Export.gerarAgregado(input,{SnapshotLib});
-  assert.deepEqual(result.object.kpis.recurrence,{numerator:1,denominator:2,calculable:true});
+  assert.deepEqual(result.object.kpis.recurrence,{indicatorId:'local.recurrence',numerator:1,denominator:2,calculable:true});
   assert.equal(result.json.includes(target),false);
 });
 

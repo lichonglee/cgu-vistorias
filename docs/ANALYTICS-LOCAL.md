@@ -24,7 +24,7 @@ A dimensão mensal conta vistorias. Gravidade, sistema e macroambiente contam co
 
 O painel representa distribuições como barras horizontais proporcionais ao maior valor de cada dimensão; rótulos e contagens exatas permanecem visíveis e acessíveis, inclusive para categorias com contagem zero. Um aviso de integridade destaca vistorias com snapshot ausente/divergente/ambíguo e vistorias editadas depois da emissão; dimensões e indicadores usam o conteúdo congelado na emissão selecionada. Rascunhos e alterações posteriores só entram quando uma nova emissão verificável é gerada. O cartão de escopo esclarece que o PIN é somente uma barreira de interface, sem autenticação institucional ou RBAC.
 
-As exportações `cgu-local-analytics-v1` e `cgu-migration-manifest-v1` exigem clique e confirmação. O agregado usa allowlist de campos e dimensões. O manifesto omite IDs por padrão; incluí-los exige marcar explicitamente a opção. Ambos recebem hash SHA-256 da serialização canônica, não assinatura/autoria. Arquivos são de classe restrita e não devem ser compartilhados ou centralizados sem aprovação de privacidade; não há limiar k aprovado.
+As exportações `cgu-local-analytics-v1` e `cgu-migration-manifest-v1` exigem clique e confirmação. O agregado usa allowlist de campos e dimensões. O manifesto omite IDs por padrão; incluí-los exige marcar explicitamente a opção. Ambos recebem hash SHA-256 da serialização canônica, não assinatura/autoria. Arquivos são de classe restrita e não devem ser compartilhados ou centralizados sem aprovação de privacidade; não há limiar k aprovado. A versão `cgu-local-analytics-v1` exporta somente os oito KPIs permitidos, com seus IDs de ficha, além das contagens e dimensões autorizadas pelo contrato; fichas de estado, ações e fila de acompanhamento permanecem locais e não são incluídas nessa exportação.
 
 Recorrência declarada conta somente constatações que carregam `recorrenciaDeId` explícito; o denominador são todas as constatações dos snapshots verificáveis na janela. O editor oferece para seleção vínculos de snapshots verificados anteriores do mesmo edifício e exige confirmação humana; o aplicativo não deduz reincidência pelo texto, similaridade, edifício ou data. Backup e snapshot validam formato UUID e impedem autorreferência, mas não provam que o destino exista, seja temporalmente anterior ou esteja no mesmo edifício; referências ausentes são permitidas e ciclos importados não são resolvidos. O KPI conta declarações, não reincidências tecnicamente verificadas. O vínculo é copiado e protegido pelo hash em novas emissões; snapshots históricos não mudam. O agregado exportável inclui apenas numerador e denominador, nunca o ID de destino. Saneamento **verificado** de apontamentos e pontuação/ordenação de risco não são calculados: não há comprovação de execução e falta rubrica aprovada de probabilidade e impacto. A área separada de ações mostra declarações locais associadas por `(vistoriaId, constatacaoId)` às constatações dos snapshots selecionados verificáveis dentro da janela analítica ativa. Se a mesma constatação mantiver seu ID em revisão posterior, a declaração anterior aparece vinculada ao indicador atual, embora continue apontando ao snapshot original. Exibe declaradas como concluídas/total declarado (canceladas excluídas) e constatações Alta/Crítica sem ação declarada/total elegível; esses números não provam saneamento. A exportação analítica e o manifesto não incluem registros de ações, responsáveis, prazos ou observações. A gravidade isolada não é tratada como risco.
 
@@ -48,3 +48,33 @@ No histórico de uma vistoria, a comparação local aceita duas emissões cujos 
 Constatações são relacionadas pelo ID estável. Campos diferentes são apresentados como declarações congeladas em cada snapshot; a ordem das constatações e os IDs locais das fotos não criam diferenças: uma mudança em `fotoIds` não altera a classificação da constatação; as evidências aparecem separadamente pelo hash. A tela carrega 100 itens por categoria e permite revelar mais em lotes, e expande os campos das constatações iguais somente quando solicitado. A direção da leitura é a emissão de referência escolhida → a emissão B selecionada, cuja lista é ordenada por data e revisão. Evidências são comparadas como multiconjunto pelo SHA-256 dos bytes, preservando a quantidade quando o mesmo conteúdo aparece mais de uma vez. Os totais de constatações conciliam separadamente os dois lados (removidas + alteradas + iguais na referência; acrescentadas + alteradas + iguais na comparação).
 
 A comparação não escreve no IndexedDB, não modifica snapshots e não acessa a rede. “Verificado” indica consistência local do snapshot e não prova autoria nem valida o arquivo PDF/DOCX. Os detalhes podem incluir texto técnico restrito; não usar em tela pública/TV sem autorização apropriada.
+
+
+## Dicionário local de indicadores
+
+As fichas abaixo são definições locais provisórias, não aprovadas pelo Product/Data Owner. A referência da regra está identificada no resumo e na exportação. O registro descreve as regras implementadas, inclusive limites de escopo; não constitui homologação institucional.
+
+<!-- INDICATOR-REGISTRY:START -->
+| ID | Indicador | Unidade |
+| --- | --- | --- |
+| local.coverage | Cobertura de edifícios na janela | razão de edifícios (numerador / denominador) |
+| local.severe-density | Densidade de constatações Altas/Críticas | razão de constatações por vistoria; pode exceder 1 e não é porcentagem |
+| local.recurrence | Vínculos de recorrência declarados | razão de declarações por constatação |
+| local.remediation | Saneamento verificado | não calculado |
+| local.formalization | Formalização local de vistorias | razão de vistorias |
+| local.snapshot-integrity | Integridade local de snapshots | razão de vistorias |
+| local.photo-association | Constatações com foto associada | razão de constatações |
+| local.gps-availability | GPS inicial disponível | razão de snapshots |
+| local.edited-after-emission | Vistorias editadas após emissão | contagem de vistorias (numerador / denominador) |
+| local.unverified-emissions | Últimas emissões sem snapshot verificável | contagem de vistorias; exibida junto ao denominador |
+| local.duplicate-candidates | Pares candidatos a duplicata | contagem de pares |
+| actions.completion | Ações declaradas como concluídas | razão de ações declaradas |
+| actions.active | Ações locais abertas ou em execução | contagem de ações |
+| actions.overdue | Ações declaradas vencidas | contagem de ações |
+| actions.aging30 | Ações abertas há mais de 30 dias | contagem de ações |
+| actions.cancelled | Ações declaradas canceladas | contagem de ações |
+| actions.high-critical-without-action | Constatações Altas/Críticas sem ação declarada | contagem (numerador / denominador) |
+| followup.overdue | Itens para acompanhamento: vencidos | contagem de linhas da fila |
+| followup.aging30 | Itens para acompanhamento: abertas há mais de 30 dias | contagem de linhas da fila |
+| followup.no-action | Itens para acompanhamento: Altas/Críticas sem ação | contagem de linhas da fila |
+<!-- INDICATOR-REGISTRY:END -->

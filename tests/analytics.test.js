@@ -218,7 +218,7 @@ test('declaração local continua associada pelo ID estável em nova revisão',(
   const vistoriaId=uid(),findingId=uid(),oldSnapshot={id:uid(),conteudo:{constatacoes:[{id:findingId,gravidade:'Alta'}]}},currentSnapshot={id:uid(),conteudo:{constatacoes:[{id:findingId,gravidade:'Alta'}]}};
   const action={vistoriaId,constatacaoId:findingId,snapshotId:oldSnapshot.id,estado:'concluida',concluidaEm:1,criadoEm:1,prazo:'2026-10-29'};
   const summary=Analytics.summarizeActions([{vistoriaId,snapshotId:currentSnapshot.id}],[oldSnapshot,currentSnapshot],[action],{asOf:'2026-10-30',now:40*86400000});
-  assert.deepEqual(summary,{completed:1,declared:1,active:0,cancelled:0,overdue:0,aging30:0,highCriticalWithoutAction:0,highCriticalTotal:1});
+  assert.deepEqual(summary,{ruleVersion:require('../indicator-registry.js').RULE_VERSION,indicatorIds:{completed:'actions.completion',declared:'actions.completion',active:'actions.active',cancelled:'actions.cancelled',overdue:'actions.overdue',aging30:'actions.aging30',highCriticalWithoutAction:'actions.high-critical-without-action',highCriticalTotal:'actions.high-critical-without-action'},completed:1,declared:1,active:0,cancelled:0,overdue:0,aging30:0,highCriticalWithoutAction:0,highCriticalTotal:1});
 });
 
 test('fila local reconcilia motivos com os KPIs e exclui ações concluídas/canceladas',()=>{
@@ -242,11 +242,11 @@ test('fila local reconcilia motivos com os KPIs e exclui ações concluídas/can
   assert.equal(count('vencida'),summary.overdue);
   assert.equal(count('aberta_30d'),summary.aging30);
   assert.equal(count('sem_acao'),summary.highCriticalWithoutAction);
-  assert.deepEqual(summary,{completed:1,declared:3,active:2,cancelled:1,overdue:1,aging30:2,highCriticalWithoutAction:2,highCriticalTotal:3});
+  assert.deepEqual(summary,{ruleVersion:require('../indicator-registry.js').RULE_VERSION,indicatorIds:{completed:'actions.completion',declared:'actions.completion',active:'actions.active',cancelled:'actions.cancelled',overdue:'actions.overdue',aging30:'actions.aging30',highCriticalWithoutAction:'actions.high-critical-without-action',highCriticalTotal:'actions.high-critical-without-action'},completed:1,declared:3,active:2,cancelled:1,overdue:1,aging30:2,highCriticalWithoutAction:2,highCriticalTotal:3});
   assert.equal(list.some(x=>x.constatacaoId===ids[2]&&x.motivo!=='sem_acao'),false);
   assert.equal(list.some(x=>x.constatacaoId===ids[3]&&x.motivo!=='sem_acao'),false);
   assert.ok(list.every(x=>!Object.hasOwn(x,'observacao')&&!Object.hasOwn(x,'descricao')&&!Object.hasOwn(x,'gps')));
-  assert.ok(list.every(x=>Object.keys(x).sort().join(',')==='actionId,constatacaoId,edificio,gravidade,motivo,prazo,snapshotId,titulo,vistoriaId'));
+  assert.ok(list.every(x=>Object.keys(x).sort().join(',')==='actionId,constatacaoId,edificio,gravidade,indicatorId,motivo,prazo,snapshotId,titulo,vistoriaId'));
 });
 
 test('fila local é determinística, respeita apenas snapshots selecionados e não infere decisão de recorrência',()=>{

@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 1.10.0 · 30/10/2026
+
+- Painel local passa a apresentar fichas recolhíveis de definição, numerador, denominador, unidade, período, fonte, exclusões e limites dos indicadores. As definições são locais e provisórias; não foram homologadas pelo Product/Data Owner.
+- Resumo e exportação analítica incluem a versão da regra e IDs das fichas dos indicadores. O painel informa a data de referência (`asOf`). O registro e a tabela documental são verificados pelos testes.
+- Sem mudança no IndexedDB v3, nos snapshots ou no backup. Cache PWA atualizado para 1.10.0; não publicar sem os gates de release já registrados.
+
 ## 1.9.0 · 30/10/2026
 
 - Criar uma vistoria não solicita geolocalização automaticamente. O GPS inicial só é pedido após ação explícita em Usar minha localização; a captura de fotos mantém seu próprio fluxo de permissão.

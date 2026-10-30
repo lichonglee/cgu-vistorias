@@ -2,10 +2,12 @@
    “Verificado” significa consistência do snapshot no IndexedDB deste aparelho,
    não autoria nem validação central. */
 (function (root, factory) {
-  const lib = factory();
+  const registry = typeof module === 'object' && module.exports ? require('./indicator-registry.js') : root.IndicatorRegistry;
+  const lib = factory(registry);
   if (typeof module === 'object' && module.exports) module.exports = lib;
   else root.Analytics = lib;
-})(typeof self !== 'undefined' ? self : this, function () {
+})(typeof self !== 'undefined' ? self : this, function (IndicatorRegistry) {
+  if (!IndicatorRegistry) throw new Error('IndicatorRegistry deve carregar antes de Analytics.');
   const GRAVIDADES = ['Informativa', 'Baixa', 'Média', 'Alta', 'Crítica'];
   const oneDecimal = n => Number(n).toFixed(1).replace('.', ',');
   const formatRatio = k => k.denominator ? `${k.numerator} / ${k.denominator} (${oneDecimal(k.numerator * 100 / k.denominator)}%)` : `${k.numerator} / 0 (sem base local)`;
@@ -90,7 +92,16 @@
     const today = validDate(asOf) || periodFor(null, null).asOf;
     const overdue = action => Boolean(validDate(action.prazo) && action.prazo < today);
     const aging = action => Number.isFinite(action.criadoEm) && now - action.criadoEm > 30 * 86400000;
-    return { completed: completed.length, declared: declared.length, active: active.length, cancelled: scoped.filter(a => a.estado === 'cancelada').length, overdue: active.filter(overdue).length, aging30: active.filter(aging).length, highCriticalWithoutAction, highCriticalTotal: highCritical.length };
+    return {
+      ruleVersion: IndicatorRegistry.RULE_VERSION,
+      indicatorIds: {
+        completed: IndicatorRegistry.idForKey('action.completion'), declared: IndicatorRegistry.idForKey('action.completion'),
+        active: IndicatorRegistry.idForKey('action.active'), cancelled: IndicatorRegistry.idForKey('action.cancelled'),
+        overdue: IndicatorRegistry.idForKey('action.overdue'), aging30: IndicatorRegistry.idForKey('action.aging30'),
+        highCriticalWithoutAction: IndicatorRegistry.idForKey('action.highCriticalWithoutAction'), highCriticalTotal: IndicatorRegistry.idForKey('action.highCriticalWithoutAction')
+      },
+      completed: completed.length, declared: declared.length, active: active.length, cancelled: scoped.filter(a => a.estado === 'cancelada').length, overdue: active.filter(overdue).length, aging30: active.filter(aging).length, highCriticalWithoutAction, highCriticalTotal: highCritical.length
+    };
   }
   function listFollowUp(migrationRecords = [], snapshots = [], actions = [], { asOf, now = Date.now() } = {}) {
     const eligible = selectedFindings(migrationRecords, snapshots), today = validDate(asOf) || periodFor(null, null).asOf;
@@ -105,12 +116,12 @@
     for (const [key, item] of eligible) {
       const { record, snapshot, work, finding } = item, linked = actionsByFinding.get(key) || [];
       const base = { constatacaoId: finding.id, vistoriaId: record.vistoriaId, snapshotId: record.snapshotId, edificio: String(work.nome || ''), titulo: String(finding.titulo || 'Sem título'), gravidade: GRAVIDADES.includes(finding.gravidade) ? finding.gravidade : 'Sem classificação' };
-      if ((finding.gravidade === 'Alta' || finding.gravidade === 'Crítica') && !linked.some(a => a.estado !== 'cancelada')) output.push({ ...base, actionId: '', motivo: 'sem_acao', prazo: '' });
+      if ((finding.gravidade === 'Alta' || finding.gravidade === 'Crítica') && !linked.some(a => a.estado !== 'cancelada')) output.push({ ...base, actionId: '', motivo: 'sem_acao', indicatorId: IndicatorRegistry.idForKey('followup.sem_acao'), prazo: '' });
       for (const action of linked) {
         if (action.estado !== 'aberta' && action.estado !== 'em-execucao') continue;
         const common = { ...base, actionId: String(action.id || ''), prazo: validDate(action.prazo) || '' };
-        if (common.prazo && common.prazo < today) output.push({ ...common, motivo: 'vencida' });
-        if (Number.isFinite(action.criadoEm) && now - action.criadoEm > 30 * 86400000) output.push({ ...common, motivo: 'aberta_30d' });
+        if (common.prazo && common.prazo < today) output.push({ ...common, motivo: 'vencida', indicatorId: IndicatorRegistry.idForKey('followup.vencida') });
+        if (Number.isFinite(action.criadoEm) && now - action.criadoEm > 30 * 86400000) output.push({ ...common, motivo: 'aberta_30d', indicatorId: IndicatorRegistry.idForKey('followup.aberta_30d') });
       }
     }
     const reasonOrder = { vencida: 0, aberta_30d: 1, sem_acao: 2 }, severityOrder = new Map([['Crítica', 0], ['Alta', 1], ['Média', 2], ['Baixa', 3], ['Informativa', 4], ['Sem classificação', 5]]);
@@ -182,8 +193,10 @@
     const inspectionsWithVerified = new Set(scopedVerified.map(r => r.vistoriaId));
     // Cobertura usa o vínculo atual da vistoria com o inventário local.
     const inspectedBuildings = new Set(scopedVerified.map(r => inspectionById.get(r.vistoriaId)?.obraId).filter(id => id && obraIds.has(id)));
-    const evidenceIds = new Set(scopedVerified.flatMap(r => arr(r.snapshot.conteudo.evidencias).map(ev => ev?.id).filter(Boolean)));
-    const linkedFindings = findings.filter(c => arr(c?.fotoIds).some(id => evidenceIds.has(id))).length;
+    const linkedFindings = scopedVerified.reduce((total, record) => {
+      const evidenceIds = new Set(arr(record.snapshot.conteudo.evidencias).map(ev => ev?.id).filter(Boolean));
+      return total + arr(record.snapshot.conteudo.constatacoes).filter(c => arr(c?.fotoIds).some(id => evidenceIds.has(id))).length;
+    }, 0);
     const gpsAvailable = scopedVerified.filter(r => hasGps(r.snapshot.conteudo.vistoria?.gps)).length;
     const editedAfterEmission = scopedVerified.filter(r => r.editedAfterEmission).length;
     const months = countBy(scopedVerified, r => {
@@ -245,20 +258,21 @@
     const recurrenceLinks = findings.filter(c => typeof c?.id === 'string' && typeof c?.recorrenciaDeId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(c.recorrenciaDeId) && c.recorrenciaDeId !== c.id).length;
     return {
       schema: 'cgu-local-analytics-v1',
+      ruleVersion: IndicatorRegistry.RULE_VERSION,
       period,
       taxonomyVersion: taxonomia?.TAXONOMIA_VERSAO || null,
       scope: 'Somente registros deste aparelho; inventário local, sem consolidação institucional.',
       verifiedMeaning: 'Consistência interna do snapshot no IndexedDB local; não prova autoria nem validação central.',
       counts: { localBuildings: obraIds.size, localInspections: vistoriaIds.size, emissionRows: E.filter(e => vistoriaIds.has(e?.vistoriaId)).length, inspectionsWithEmission: emissionsByInspection.size, inspectionsWithVerifiedSnapshot: verifiedLatest.length, unverifiedLatestEmissions: semSnapshotVerificavel.length, periodInspections: scopedInspections.length, undatedInspectionsExcluded: period.windowMonths === null ? 0 : V.filter(v => !validDate(periodDateFor(v))).length, periodEmissionRows: E.filter(e => scopedIds.has(e?.vistoriaId)).length, periodInspectionsWithEmission: inspectionsWithEmission.size, periodInspectionsWithVerifiedSnapshot: inspectionsWithVerified.size, periodUnverifiedLatestEmissions: scopedUnverified.length, verifiedFindings: findings.length },
       kpis: {
-        coverage: { numerator: inspectedBuildings.size, denominator: obraIds.size, meaning: `Edifícios locais com snapshot verificável na janela (${period.label}) / edifícios cadastrados neste aparelho.` },
-        severeDensity: { numerator: severe, denominator: scopedVerified.length, meaning: `Constatações Alta ou Crítica / vistorias com último snapshot verificável na janela (${period.label}).` },
-        recurrence: { numerator: recurrenceLinks, denominator: findings.length, calculable: findings.length > 0, meaning: 'Constatações com vínculo de recorrência declarado / constatações dos snapshots verificáveis; relação declarada, não verificada.' },
-        remediation: { calculable: false, reason: 'Saneamento verificado não é calculado; ações locais são declarações do usuário sem comprovação de execução.' },
-        formalization: { numerator: inspectionsWithEmission.size, denominator: scopedInspections.length, meaning: `Vistorias locais com emissão / vistorias na janela (${period.label}).` },
-      snapshotIntegrity: { numerator: inspectionsWithVerified.size, denominator: inspectionsWithEmission.size, meaning: `Vistorias com snapshot selecionado verificável / vistorias com emissão na janela (${period.label}).` },
-      photoAssociation: { numerator: linkedFindings, denominator: findings.length, meaning: 'Constatações com ao menos uma foto vinculada existente / constatações nos snapshots verificáveis.' },
-      gpsAvailability: { numerator: gpsAvailable, denominator: scopedVerified.length, meaning: 'Snapshots verificáveis com coordenadas GPS de início / snapshots verificáveis na janela. Indicador descritivo, não nota de qualidade.' }
+        coverage: { indicatorId: IndicatorRegistry.idForKey('kpi.coverage'), numerator: inspectedBuildings.size, denominator: obraIds.size, meaning: `Edifícios locais com snapshot verificável na janela (${period.label}) / edifícios cadastrados neste aparelho.` },
+        severeDensity: { indicatorId: IndicatorRegistry.idForKey('kpi.severeDensity'), numerator: severe, denominator: scopedVerified.length, meaning: `Constatações Alta ou Crítica / vistorias com último snapshot verificável na janela (${period.label}).` },
+        recurrence: { indicatorId: IndicatorRegistry.idForKey('kpi.recurrence'), numerator: recurrenceLinks, denominator: findings.length, calculable: findings.length > 0, meaning: 'Constatações com vínculo de recorrência declarado / constatações dos snapshots verificáveis; relação declarada, não verificada.' },
+        remediation: { indicatorId: IndicatorRegistry.idForKey('kpi.remediation'), calculable: false, reason: 'Saneamento verificado não é calculado; ações locais são declarações do usuário sem comprovação de execução.' },
+        formalization: { indicatorId: IndicatorRegistry.idForKey('kpi.formalization'), numerator: inspectionsWithEmission.size, denominator: scopedInspections.length, meaning: `Vistorias locais com emissão / vistorias na janela (${period.label}).` },
+      snapshotIntegrity: { indicatorId: IndicatorRegistry.idForKey('kpi.snapshotIntegrity'), numerator: inspectionsWithVerified.size, denominator: inspectionsWithEmission.size, meaning: `Vistorias com snapshot selecionado verificável / vistorias com emissão na janela (${period.label}).` },
+      photoAssociation: { indicatorId: IndicatorRegistry.idForKey('kpi.photoAssociation'), numerator: linkedFindings, denominator: findings.length, meaning: 'Constatações com ao menos uma foto vinculada existente / constatações nos snapshots verificáveis.' },
+      gpsAvailability: { indicatorId: IndicatorRegistry.idForKey('kpi.gpsAvailability'), numerator: gpsAvailable, denominator: scopedVerified.length, meaning: 'Snapshots verificáveis com coordenadas GPS de início / snapshots verificáveis na janela. Indicador descritivo, não nota de qualidade.' }
       },
       dimensions: { severity, systemGroup: systems, environmentGroup: environments, systemCode: systemCodes, environmentCode: environmentCodes, month: months },
       duplicateCandidates,
