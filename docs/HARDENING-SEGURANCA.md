@@ -22,7 +22,7 @@ Branch local: `codex/security-hardening` (derivada de `origin/main`, v1.0.6).
 
 ```text
 node --test tests/backup.security.test.cjs tests/emission-snapshot.test.js
-38 pass, 0 fail, 0 skipped
+40 pass, 0 fail, 0 skipped (reproduzido por Codex em 30/10/2026)
 ```
 
 Inclui negativos para ID com aspas, campo extra e `__proto__`, envelope v2/lista ausente, coleção excessiva, vistoria órfã, updatedAt com tipo errado, URLs externas sem chamada de rede, SVG/HTML, base64 e magic bytes inválidos, limite de blob, MIME/tamanho/digest PDF inválidos, snapshot adulterado, crop malformado e fórmulas CSV. Testa importação repetida de foto como duplicata e mesmo ID com conteúdo divergente como conflito preservando o local, hash concorrente serializado e gravação fail-closed sem `Backup`. O roundtrip verifica bytes da evidência, original de crop, snapshot e PDF emitido.
@@ -31,8 +31,8 @@ Também passaram `node --check` em `app.js`, `db.js`, `backup.js` e `emission-sn
 
 ## Limites da evidência e riscos restantes
 
-- CSP foi verificada estaticamente em Node; ainda requer smoke test em navegador real para registrar violações de console e confirmar câmera, SW e geração/download PDF/DOCX sob a política.
-- Os testes de Node exercitam validação e roundtrip puro, não executam IndexedDB de navegador; a atomicidade está implementada numa transação única e ainda deve receber teste de falha/abort em navegador.
+- Smoke browser isolado em 30/10/2026, portal local 8769: 9/9 verificações passaram, console sem logs. Confirmou CSP same-origin e bloqueio de script inline (`securitypolicyviolation`), roundtrip real de `cropBackup.base` de 153600 bytes, fingerprint estável, rejeição de URL externa sem `fetch`, importação/reimportação idempotente/conflitante em IndexedDB real e limpeza da fixture sintética. O harness e todos os dados usados foram locais e fictícios.
+- O smoke não percorreu o app completo: câmera, service worker, geração/download PDF/DOCX, atualização/rollback da PWA e aborto de transação por falha ainda requerem QA no app real. Os testes de concorrência de `put`/`del` e `delVistoria` usam IndexedDB simulado em Node; a condição de exclusão foi revisada pela Sentinela, mas ainda não foi exercitada temporalmente em IndexedDB de navegador.
 - Colisões são preservadas localmente e relatadas; ainda não há fluxo interativo de escolha manter/substituir/duplicar. Fotos sem digest anterior são tratadas conservadoramente como conflito.
 - O backup continua em texto JSON sem criptografia. O aviso de classificação reduz erro operacional, mas não substitui cifra/armazenamento autorizado.
 - PIN do painel continua sendo barreira local de interface, não autenticação de usuário nem controle de acesso multiusuário.
