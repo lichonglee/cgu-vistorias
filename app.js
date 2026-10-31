@@ -116,6 +116,7 @@ function getPos() {
 }
 
 /* ---------- fotos ---------- */
+const geoDenied = async () => { try { return (await navigator.permissions.query({ name: 'geolocation' })).state === 'denied'; } catch { return false; } };
 let cap = { vid: null, pos: null, then: null };
 function startCapture(vid, kind) {
   cap = { vid, pos: kind === 'cam' ? getPos() : Promise.resolve(null), kind, t0: Date.now() };
@@ -140,7 +141,10 @@ async function processImage(file, ts, pos, v) {
 }
 async function addPhotos(files, kind) {
   const v = await DB.get('vistorias', cap.vid); if (!v) return;
-  const pos = await cap.pos; let last = null;
+  let pos = await cap.pos, last = null;
+  /* No Android a câmera abre antes do pedido de permissão de localização e a primeira leitura falha; com a página de volta
+     em primeiro plano, tenta mais uma vez, salvo se a permissão já foi negada. */
+  if (kind === 'cam' && !pos && !(await geoDenied())) pos = await getPos();
   if (kind === 'cam' && !pos) toast('Sem GPS: a foto foi salva sem coordenadas. Verifique a permissão de localização.', 4200);
   for (const file of files) {
     const lm = file.lastModified, now = Date.now();
