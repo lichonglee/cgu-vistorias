@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 1.10.2 · 30/10/2026
+
+- Endurece a análise local: auto-vínculo de recorrência é comparado sem distinção entre maiúsculas e minúsculas; constatações sem ID continuam no denominador, mas não entram no numerador.
+- Candidatos a duplicata exigem edifício atual presente no inventário deste aparelho; a ficha documenta os campos usados no hash e seus limites.
+- Atualiza as definições para cgu-local-indicators-1.0.2; sem mudança no IndexedDB, snapshots ou backup. Cache PWA versionado como 1.10.2. PDF do manual e ensaios de navegador seguem pendentes.
+
 ## 1.10.1 · 30/10/2026
 
 - Corrige o dicionário local para explicitar os limites dos vínculos de recorrência, as datas usadas nas janelas, a associação de fotos no próprio snapshot e o escopo dos pares candidatos a duplicata.

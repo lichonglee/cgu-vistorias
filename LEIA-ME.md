@@ -1,4 +1,4 @@
-# CGU Vistorias v1.10.1
+# CGU Vistorias v1.10.2
 
 Consulte o [README](README.md) para publicação e manutenção ou abra o [manual do usuário](manual.html).
 

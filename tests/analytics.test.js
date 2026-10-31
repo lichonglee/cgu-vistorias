@@ -12,7 +12,7 @@ const uid = () => crypto.randomUUID();
 async function report({ obraId, vistoriaId, seq, rev, date, timestamp, findings = [], withGps = false, withPhoto = false }) {
   const obra = { id: obraId, nome: 'SENSITIVE BUILDING NAME', cliente: 'private', endereco: 'private', contrato: '', art: '', criadoEm: 1 };
   const photo = withPhoto ? { id: uid(), vistoriaId, blob: new Blob([new Uint8Array([255, 216, 255, 1])], { type: 'image/jpeg' }), ts: timestamp, lat: null, lon: null, descricao: 'SENSITIVE PHOTO NOTE', origem: 'camera', w: 2, h: 2, marks: [], notas: [] } : null;
-  const vistoria = { id: vistoriaId, obraId, local: 'SENSITIVE LOCATION', tipo: 'Vistoria técnica de rotina', data: date, hora: '09:00', status: 'emitido', nFotos: photo ? 1 : 0, seq, ano: 2026, updatedAt: timestamp, gps: withGps ? { lat: -15.8, lon: -47.9, acc: 5 } : null, constatacoes: findings.map((f, i) => ({ id: f.id || uid(), ...(f.recorrenciaDeId ? { recorrenciaDeId: f.recorrenciaDeId } : {}), titulo: 'SENSITIVE FINDING', tipo: f.tipo, gravidade: f.gravidade, ambiente: f.ambiente, local: 'private', descricao: 'private', recomendacao: 'private', fotoIds: photo && i === 0 ? [photo.id] : [] })) };
+  const vistoria = { id: vistoriaId, obraId, local: 'SENSITIVE LOCATION', tipo: 'Vistoria técnica de rotina', data: date, hora: '09:00', status: 'emitido', nFotos: photo ? 1 : 0, seq, ano: 2026, updatedAt: timestamp, gps: withGps ? { lat: -15.8, lon: -47.9, acc: 5 } : null, constatacoes: findings.map((f, i) => ({ id: Object.hasOwn(f, 'id') ? f.id : uid(), ...(f.recorrenciaDeId ? { recorrenciaDeId: f.recorrenciaDeId } : {}), titulo: 'SENSITIVE FINDING', tipo: f.tipo, gravidade: f.gravidade, ambiente: f.ambiente, local: 'private', descricao: 'private', recomendacao: 'private', fotoIds: photo && i === 0 ? [photo.id] : [] })) };
   const emissaoId = uid();
   const conteudo = await SnapshotLib.capturar({ obra, vistoria, fotos: photo ? [photo] : [], cfg: { empresa: { nome: 'private' }, rt: { nome: 'private' }, usuario: 'private' }, emissao: { tipo: 'tecnico', numero: { seq, ano: 2026 }, rev }, appVersion: '1.6.0' });
   const snapshot = await SnapshotLib.criar({ id: uid(), emissaoId, formato: 'pdf', conteudo, appVersion: '1.6.0', criadoEm: timestamp });
@@ -116,6 +116,23 @@ test('recorrência conta só vínculos explícitos válidos, sem inferir pelo co
   assert.equal(JSON.stringify(result.kpis.recurrence).includes(target),false);
 });
 
+test('recorrência compara auto-vínculo sem diferenciar caixa e preserva constatação sem ID no denominador', async () => {
+  const obraId=uid(), selfId=uid(), target=uid(), vistoriaId=uid();
+  const snapshot={id:'snapshot-recurrence-edge',hash:'a'.repeat(64),conteudo:{obra:{id:obraId},vistoria:{data:'2026-10-01'},constatacoes:[
+    {id:selfId,recorrenciaDeId:selfId.toUpperCase()},
+    {recorrenciaDeId:target},
+    {id:uid(),recorrenciaDeId:target},
+    {id:uid().toUpperCase(),recorrenciaDeId:target.toUpperCase()},
+    {id:uid(),recorrenciaDeId:target.toUpperCase()}
+  ],evidencias:[]}};
+  const emission={id:'emission-recurrence-edge',vistoriaId,obraId,tipo:'tecnico',formato:'pdf',rev:1,data:100,snapshotId:snapshot.id,snapshotHash:snapshot.hash};
+  const lib={canonicalize:value=>JSON.stringify(value),verificarEmissao:async()=>({estado:'verificado'})};
+  const result=await Analytics.resumir({obras:[{id:obraId}],vistorias:[{id:vistoriaId,obraId,data:'2026-10-01'}],emissoes:[emission],snapshots:[snapshot],snapshotLib:lib});
+  assert.deepEqual([result.kpis.recurrence.numerator,result.kpis.recurrence.denominator],[3,5]);
+  assert.match(result.kpis.recurrence.meaning,/sem distinção entre maiúsculas e minúsculas/);
+  assert.match(result.kpis.recurrence.meaning,/destino não conferido/);
+});
+
 test('empate de revisão/data exige todos os snapshots válidos e conteúdo analítico idêntico', async () => {
   const valid = await report({ obraId: uid(), vistoriaId: uid(), seq: 9, rev: 1, date: '2026-10-01', timestamp: 500, findings: [{ gravidade: 'Alta', tipo: 'Fissura', ambiente: 'Fachada' }] });
   const divergent = { ...valid.emission, id: uid(), snapshotHash: '0'.repeat(64) };
@@ -159,6 +176,21 @@ test('candidatos a duplicata exigem edifício/data/conteúdo iguais e só devolv
   assert.deepEqual(result.duplicateCandidates.map(x => [x.vistoriaIdA, x.vistoriaIdB]), [[sortedIds[0], sortedIds[1]]]);
   assert.equal(JSON.stringify(rows.map(x => x.vistoria)), before);
   assert.equal(JSON.stringify(result.duplicateCandidates).includes('SENSITIVE'), false);
+});
+
+test('vistorias sem edifício atual no inventário não geram candidatos a duplicata', async()=>{
+  const finding={titulo:'igual',tipo:'Fissura',gravidade:'Alta',ambiente:'Fachada'},rows=[];
+  for(const [i,obraId] of [undefined,undefined,'obra-removida','obra-removida'].entries()){
+    const vistoriaId=`vistoria-sem-inventario-${i}`,snapshotId=`snapshot-sem-inventario-${i}`;
+    rows.push({vistoria:{id:vistoriaId,...(obraId?{obraId}:{}),data:'2026-06-01'},emission:{id:`emissao-sem-inventario-${i}`,vistoriaId,snapshotId,rev:1,data:i},snapshot:{id:snapshotId,conteudo:{obra:{id:obraId||'historical'},vistoria:{data:'2026-06-01'},constatacoes:[finding],evidencias:[]}}});
+  }
+  const lib={canonicalize:value=>JSON.stringify(value),verificarEmissao:async()=>({estado:'verificado'})};
+  const summarize=obras=>Analytics.resumir({obras,vistorias:rows.map(x=>x.vistoria),emissoes:rows.map(x=>x.emission),snapshots:rows.map(x=>x.snapshot),snapshotLib:lib});
+  const result=await summarize([]);
+  assert.deepEqual(result.duplicateCandidates,[]);
+  assert.equal(result.duplicateCandidatesTotal,0);
+  const positive=await summarize([{id:'obra-removida'}]);
+  assert.deepEqual(positive.duplicateCandidates.map(x=>[x.vistoriaIdA,x.vistoriaIdB]),[['vistoria-sem-inventario-2','vistoria-sem-inventario-3']]);
 });
 
 test('relatório de lacunas conta campos ausentes/inválidos e IDs locais sem refletir conteúdo', async()=>{

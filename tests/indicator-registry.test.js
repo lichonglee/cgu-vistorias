@@ -146,19 +146,26 @@ test('fichas explicitam limites de recorrência, janela, fotos e duplicatas', ()
   const duplicates = Registry.get('local.duplicate-candidates');
   assert.match(duplicates.source, /limitada a 200 pares/);
   assert.match(duplicates.source, /obraId atual/);
+  assert.match(duplicates.source, /obraId atual existente no inventário deste aparelho/);
+  assert.match(duplicates.exclusions, /IDs\/bytes das fotos e vínculo de recorrência não entram no hash/);
+  assert.match(recurrence.definition, /sem distinção entre maiúsculas e minúsculas/);
+  assert.match(recurrence.exclusions, /sem ID textual continuam no denominador/);
 });
 
 test('versão da regra e hash da ficha congelam mudanças de definição', () => {
-  assert.equal(Registry.RULE_VERSION, 'cgu-local-indicators-1.0.1');
+  assert.equal(Registry.RULE_VERSION, 'cgu-local-indicators-1.0.2');
   const hash = crypto.createHash('sha256').update(JSON.stringify(Registry.list())).digest('hex');
-  assert.equal(hash, '3de84974a0f0b3ffbc8955ef4d22015afef9669fae318e051a501ac61bf23764');
+  assert.equal(hash, '5a24ee79cfe9e749634f2d2bf940dcb4a99d90bb2871978bb7b7ff669a60e989');
 });
 
 test('fichas são definidas em uma única lista, sem overrides paralelos', () => {
   const source = read('indicator-registry.js');
+  const docs = read('docs/ANALYTICS-LOCAL.md');
+  const introduction = docs.slice(0, docs.indexOf('<!-- INDICATOR-REGISTRY:START -->'));
   assert.match(source, /const raw = \[/);
   assert.doesNotMatch(source, /const overrides\s*=/);
   assert.doesNotMatch(source, /overrides\[item\.id\]/);
+  assert.ok(introduction.includes('A versão atual é `' + Registry.RULE_VERSION + '`'), 'introduction declares the current rule version');
 });
 
 test('renderização escapa período e rótulos; tabela documental coincide com o registro', () => {

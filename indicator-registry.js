@@ -4,7 +4,7 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.IndicatorRegistry = api;
 })(typeof self !== 'undefined' ? self : this, function () {
-  const RULE_VERSION = 'cgu-local-indicators-1.0.1';
+  const RULE_VERSION = 'cgu-local-indicators-1.0.2';
   const localLimit = 'Definição local provisória, não aprovada pelo Product/Data Owner; não é uma medida de risco nem uma visão institucional consolidada.';
   const raw = [
     {
@@ -37,13 +37,13 @@
       "id": "local.recurrence",
       "key": "kpi.recurrence",
       "label": "Vínculos de recorrência declarados",
-      "definition": "Constatações cujo recorrenciaDeId tem formato UUID válido e difere do próprio ID; o destino declarado não é conferido aqui.",
-      "numerator": "Constatações com recorrenciaDeId em formato UUID válido e diferente do próprio id",
+      "definition": "Constatações com ID textual e recorrenciaDeId em formato UUID válido, sem vínculo com o próprio ID, comparado sem distinção entre maiúsculas e minúsculas; o destino declarado não é conferido aqui.",
+      "numerator": "Constatações com ID textual e recorrenciaDeId em formato UUID válido e diferente do próprio ID sem distinção entre maiúsculas e minúsculas",
       "denominator": "Todas as constatações dos snapshots locais verificáveis, inclusive as sem vínculo e as de primeira emissão",
       "unit": "razão de declarações por constatação",
       "window": "Janela selecionada.",
       "source": "Vínculos explícitos presentes nos snapshots.",
-      "exclusions": "O formato do UUID é verificado; o indicador não confirma se o destino existe, é anterior, pertence ao mesmo edifício ou está verificado. Não procura similaridade textual nem infere recorrência.",
+      "exclusions": "Constatações sem ID textual continuam no denominador e não podem entrar no numerador. O formato do UUID é verificado; a comparação com o próprio ID ignora maiúsculas/minúsculas. O indicador não confirma se o destino existe, é anterior, pertence ao mesmo edifício ou está verificado. Não procura similaridade textual nem infere recorrência.",
       "limits": "Vínculo declarado; formato validado, destino não conferido por este indicador. Definição local provisória, não aprovada pelo Product/Data Owner; não é uma medida de risco nem uma visão institucional consolidada."
     },
     {
@@ -141,13 +141,13 @@
       "id": "local.duplicate-candidates",
       "key": "status.duplicateCandidates",
       "label": "Pares candidatos a duplicata",
-      "definition": "Pares locais de snapshots selecionados verificáveis que compartilham o edifício atual da vistoria, data e hash do conteúdo de constatações, mas têm IDs distintos.",
+      "definition": "Pares locais de snapshots selecionados verificáveis que têm obraId atual presente no inventário deste aparelho, data congelada e mesmo hash dos campos textuais selecionados e da quantidade de fotos nas constatações, mas IDs distintos.",
       "numerator": "Pares candidatos detectados; a lista mostra no máximo 200 e informa o total separado",
       "denominator": "Não se aplica",
       "unit": "contagem de pares",
       "window": "Janela selecionada.",
-      "source": "Snapshots verificáveis selecionados, obraId atual e hash de conteúdo; exibição ordenada e limitada a 200 pares, com total separado.",
-      "exclusions": "Registros vazios, sem data válida, com digest indisponível ou fora da seleção de snapshots verificáveis.",
+      "source": "Snapshots verificáveis selecionados e obraId atual existente no inventário deste aparelho; hash de título, tipo, gravidade, ambiente, local, descrição, recomendação e quantidade de fotos, com pares ordenados e exibição limitada a 200 pares, com total separado.",
+      "exclusions": "Registros sem constatações, edifício ausente do inventário local, sem data congelada válida, com digest indisponível ou fora da seleção de snapshots verificáveis; IDs/bytes das fotos e vínculo de recorrência não entram no hash.",
       "limits": "Apenas alerta; nunca mescla nem confirma que os registros sejam duplicados. Definição local provisória, não aprovada pelo Product/Data Owner; não é uma medida de risco nem uma visão institucional consolidada."
     },
     {

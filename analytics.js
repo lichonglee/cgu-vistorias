@@ -214,13 +214,13 @@
       const content = arr(r.snapshot.conteudo.constatacoes).map(c => ({ titulo: keyOf(c?.titulo), tipo: keyOf(c?.tipo), gravidade: keyOf(c?.gravidade), ambiente: keyOf(c?.ambiente), local: keyOf(c?.local), descricao: keyOf(c?.descricao), recomendacao: keyOf(c?.recomendacao), fotoCount: arr(c?.fotoIds).length })).sort((a, b) => compareText(snapshotLib.canonicalize(a), snapshotLib.canonicalize(b)));
       if (!content.length || !duplicateCandidatesAvailable) continue;
       const v = r.snapshot.conteudo.vistoria || {}, obraId = inspectionById.get(r.vistoriaId)?.obraId, inspectionDate = validDate(v.data);
-      if (!inspectionDate) continue;
+      if (!obraId || !obraIds.has(obraId) || !inspectionDate) continue;
       const canonical = snapshotLib.canonicalize({ obraId, data: inspectionDate, constatacoes: content });
       let digestBytes;
       try { digestBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical)); }
       catch { duplicateCandidatesAvailable = false; duplicateBuckets.clear(); break; }
       const digest = [...new Uint8Array(digestBytes)].map(x => x.toString(16).padStart(2, '0')).join('');
-      const key = `${obraId || ''}|${validDate(v.data) || ''}|${digest}`;
+      const key = `${obraId}|${inspectionDate}|${digest}`;
       if (!duplicateBuckets.has(key)) duplicateBuckets.set(key, []);
       duplicateBuckets.get(key).push(r.vistoriaId);
     }
@@ -255,7 +255,7 @@
     const unknownSeverity = findings.filter(c => !GRAVIDADES.includes(c?.gravidade)).length;
     if (unknownSeverity) severity.push({ label: 'Sem classificação', count: unknownSeverity });
 
-    const recurrenceLinks = findings.filter(c => typeof c?.id === 'string' && typeof c?.recorrenciaDeId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(c.recorrenciaDeId) && c.recorrenciaDeId !== c.id).length;
+    const recurrenceLinks = findings.filter(c => typeof c?.id === 'string' && typeof c?.recorrenciaDeId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(c.recorrenciaDeId) && c.recorrenciaDeId.toLowerCase() !== c.id.toLowerCase()).length;
     return {
       schema: 'cgu-local-analytics-v1',
       ruleVersion: IndicatorRegistry.RULE_VERSION,
@@ -267,7 +267,7 @@
       kpis: {
         coverage: { indicatorId: IndicatorRegistry.idForKey('kpi.coverage'), numerator: inspectedBuildings.size, denominator: obraIds.size, meaning: `Edifícios locais com snapshot verificável na janela (${period.label}) / edifícios cadastrados neste aparelho.` },
         severeDensity: { indicatorId: IndicatorRegistry.idForKey('kpi.severeDensity'), numerator: severe, denominator: scopedVerified.length, meaning: `Constatações Alta ou Crítica / vistorias com último snapshot verificável na janela (${period.label}).` },
-        recurrence: { indicatorId: IndicatorRegistry.idForKey('kpi.recurrence'), numerator: recurrenceLinks, denominator: findings.length, calculable: findings.length > 0, meaning: 'Constatações com vínculo de recorrência declarado / constatações dos snapshots verificáveis; relação declarada, não verificada.' },
+        recurrence: { indicatorId: IndicatorRegistry.idForKey('kpi.recurrence'), numerator: recurrenceLinks, denominator: findings.length, calculable: findings.length > 0, meaning: 'Constatações com ID textual e recorrenciaDeId em formato UUID válido, sem vínculo com o próprio ID (comparação sem distinção entre maiúsculas e minúsculas) / todas as constatações dos snapshots verificáveis; destino não conferido.' },
         remediation: { indicatorId: IndicatorRegistry.idForKey('kpi.remediation'), calculable: false, reason: 'Saneamento verificado não é calculado; ações locais são declarações do usuário sem comprovação de execução.' },
         formalization: { indicatorId: IndicatorRegistry.idForKey('kpi.formalization'), numerator: inspectionsWithEmission.size, denominator: scopedInspections.length, meaning: `Vistorias locais com emissão / vistorias na janela (${period.label}).` },
       snapshotIntegrity: { indicatorId: IndicatorRegistry.idForKey('kpi.snapshotIntegrity'), numerator: inspectionsWithVerified.size, denominator: inspectionsWithEmission.size, meaning: `Vistorias com snapshot selecionado verificável / vistorias com emissão na janela (${period.label}).` },
