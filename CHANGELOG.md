@@ -3,6 +3,7 @@
 ## 1.10.4 · 30/10/2026
 
 - Ações declaradas: salvar com a função responsável vazia passa a informar que o campo é obrigatório; o limite de 120 caracteres tem mensagem própria. Nenhuma regra de validação mudou.
+- Manual PDF regenerado a partir do manual HTML 1.10.4 (19 páginas); as capturas de tela seguem identificadas como ilustrativas de versões anteriores.
 - Sem mudança no IndexedDB, snapshots, indicadores ou backup. Cache PWA versionado como 1.10.4.
 
 ## 1.10.3 · 30/10/2026
