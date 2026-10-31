@@ -23,6 +23,7 @@ test('aba antiga mantém tela e modal para copiar o rascunho e mostra aviso acim
   assert.match(listener, /setAttribute\('role', 'alert'\)/);
   assert.match(listener, /if \(\$\('#db-gone'\)\) return;/, 'aviso único');
   assert.match(app, /addEventListener\('hashchange', \(\) => \{ if \(!S\) return; closeModal\(\);/, 'navegar sem banco não fecha o modal com rascunho');
+  assert.match(app, /addEventListener\('unhandledrejection', \(\) => \{\s*if \(\$\('#db-gone'\)\) toast\('Não salvo:/, 'gravação sem banco avisa, e só quando o banco foi perdido');
   const css = fs.readFileSync(path.join(__dirname, '..', 'app.css'), 'utf8');
   const z = Number((css.match(/\.db-gone\{[^}]*z-index:(\d+)/) || [])[1]);
   const maxOther = Math.max(...[...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(m => !m[1].includes('db-gone')).map(m => Number((m[2].match(/z-index:(\d+)/) || [])[1] || 0)));

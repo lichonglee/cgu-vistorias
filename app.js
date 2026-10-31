@@ -875,6 +875,10 @@ addEventListener('cgu-db-versionchange', () => {
   aviso.innerHTML = '<b>O aplicativo foi atualizado em outra aba.</b> Esta aba não salva mais alterações. Copie o que ainda não foi salvo e recarregue a página.';
   document.body.append(aviso);
 });
+/* Sem banco, gravações falham com InvalidStateError fora de qualquer try: avisa a cada tentativa em vez de falhar em silêncio. */
+addEventListener('unhandledrejection', () => {
+  if ($('#db-gone')) toast('Não salvo: esta aba perdeu o acesso aos registros. Copie o texto e recarregue a página.', 6000);
+});
 (async () => {
   try { await DB.open(); await loadSettings(); await loadLogo(); }
   catch (e) {
