@@ -116,7 +116,18 @@ function getPos() {
 }
 
 /* ---------- fotos ---------- */
-const geoDenied = async () => { try { return (await navigator.permissions.query({ name: 'geolocation' })).state === 'denied'; } catch { return false; } };
+const GEO_WAIT_MS = 15000; /* espera máxima pelo GPS depois da foto, definida pelo usuário */
+const geoState = async () => { try { return (await navigator.permissions.query({ name: 'geolocation' })).state; } catch { return 'unknown'; } };
+/* Espera a pessoa responder ao pedido de localização (até 60 s); devolve o estado final, ou 'unknown' sem Permissions API. */
+const geoDecision = () => new Promise(res => {
+  try {
+    navigator.permissions.query({ name: 'geolocation' }).then(p => {
+      if (p.state !== 'prompt') return res(p.state);
+      const t = setTimeout(() => { p.onchange = null; res('prompt'); }, 60000);
+      p.onchange = () => { if (p.state !== 'prompt') { clearTimeout(t); p.onchange = null; res(p.state); } };
+    }, () => res('unknown'));
+  } catch { res('unknown'); }
+});
 let cap = { vid: null, pos: null, then: null };
 function startCapture(vid, kind) {
   cap = { vid, pos: kind === 'cam' ? getPos() : Promise.resolve(null), kind, t0: Date.now() };
@@ -141,10 +152,16 @@ async function processImage(file, ts, pos, v) {
 }
 async function addPhotos(files, kind) {
   const v = await DB.get('vistorias', cap.vid); if (!v) return;
-  let pos = await cap.pos, last = null;
-  /* No Android a câmera abre antes do pedido de permissão de localização e a primeira leitura falha; com a página de volta
-     em primeiro plano, tenta mais uma vez, salvo se a permissão já foi negada. */
-  if (kind === 'cam' && !pos && !(await geoDenied())) pos = await getPos();
+  /* No Android a câmera abre antes do pedido de permissão de localização e a primeira leitura falha ou fica presa no pedido.
+     Um único prazo de GEO_WAIT_MS, contado da volta da câmera, limita a espera: salvo se a permissão foi negada, lê de novo
+     e, se ainda faltar posição, aguarda a resposta da pessoa para uma última leitura; no fim do prazo a foto segue sem GPS. */
+  const prazo = kind === 'cam' ? new Promise(res => setTimeout(() => res(null), GEO_WAIT_MS)) : null;
+  if (prazo) toast('Obtendo localização…', GEO_WAIT_MS);
+  let pos = await (prazo ? Promise.race([cap.pos, prazo]) : cap.pos), last = null;
+  if (kind === 'cam' && !pos && (await geoState()) !== 'denied') {
+    const tentativa = (async () => { const p = await getPos(); return p || ((await geoDecision()) === 'granted' ? getPos() : null); })();
+    pos = await Promise.race([tentativa, prazo]);
+  }
   if (kind === 'cam' && !pos) toast('Sem GPS: a foto foi salva sem coordenadas. Verifique a permissão de localização.', 4200);
   for (const file of files) {
     const lm = file.lastModified, now = Date.now();
