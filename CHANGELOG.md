@@ -5,6 +5,7 @@
 - Ações declaradas: salvar com a função responsável vazia passa a informar que o campo é obrigatório; o limite de 120 caracteres tem mensagem própria. Nenhuma regra de validação mudou.
 - Se o armazenamento local do navegador não abrir, o aplicativo mostra um aviso com orientação em vez de uma tela vazia; as rotas não sobrescrevem esse aviso.
 - Atualização do armazenamento bloqueada por outra aba aberta passa a mostrar o mesmo aviso; abas antigas liberam o banco quando uma versão nova o solicita e mostram um aviso fixo pedindo recarga, sem fechar a tela nem o formulário aberto, para que o texto ainda não salvo possa ser copiado; tentativas de salvar nessa aba informam que nada foi salvo. Em falha de armazenamento o service worker não é registrado nessa visita.
+- Acessibilidade: rótulos dos formulários passam a nomear os campos e as fotos ganham texto alternativo (Dados, Conclusão, filtros do Painel, Ajustes e demais telas montadas por template); tabelas com rolagem horizontal recebem foco de teclado e nome de região; etiquetas verde e amarela ganham contraste de pelo menos 4,5:1.
 - Manual PDF regenerado a partir do manual HTML 1.10.4 (19 páginas); as capturas de tela seguem identificadas como ilustrativas de versões anteriores.
 - Sem mudança no IndexedDB, snapshots, indicadores ou backup. Cache PWA versionado como 1.10.4.
 

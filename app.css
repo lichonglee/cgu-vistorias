@@ -33,7 +33,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--a);border-color:
 .seg button{flex:0 0 auto;border:1px solid var(--line);background:#fff;border-radius:20px;padding:8px 14px;font:600 14px inherit;font-family:inherit;color:var(--mut)}
 .seg button.on{background:var(--b);color:#fff;border-color:var(--b)}
 .chip{display:inline-block;font-size:12px;font-weight:700;border-radius:20px;padding:2px 9px;background:var(--soft);color:var(--b)}
-.chip.ok{background:#e3f4ea;color:var(--ok)}.chip.warn{background:#fbf0d9;color:var(--warn)}.chip.bad{background:#fbe5e2;color:var(--bad)}.chip.mut{background:#eceff5;color:var(--mut)}
+.chip.ok{background:#e3f4ea;color:#1E6B41}.chip.warn{background:#fbf0d9;color:#8A5A12}.chip.bad{background:#fbe5e2;color:var(--bad)}.chip.mut{background:#eceff5;color:var(--mut)}
 .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
 .ph{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:#dde4f2;border:1px solid var(--line)}
 .ph img{width:100%;height:100%;object-fit:cover;display:block}

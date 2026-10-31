@@ -68,6 +68,22 @@ const fld = (label, path, obj, o = {}) => {
   if (o.area) return `<div><label>${label}</label><textarea ${a} rows="${o.rows || 3}">${esc(v)}</textarea></div>`;
   return `<div><label>${label}</label><input ${a} type="${o.type || 'text'}" value="${esc(v)}"></div>`;
 };
+/* Acessibilidade das telas montadas por template: cada <label> sem for passa a nomear o campo que vem logo depois, e
+   tabelas com rolagem horizontal (.tw) recebem foco de teclado e nome de região. */
+let a11ySeq = 0;
+function a11yFix(root) {
+  for (const label of root.querySelectorAll('label:not([for])')) {
+    const field = label.nextElementSibling;
+    if (label.querySelector('input,select,textarea') || !field?.matches('input,select,textarea')) continue;
+    if (!field.id) field.id = 'campo-' + (++a11ySeq);
+    label.htmlFor = field.id;
+  }
+  for (const wrap of root.querySelectorAll('.tw:not([tabindex])')) {
+    wrap.tabIndex = 0; wrap.setAttribute('role', 'region');
+    wrap.setAttribute('aria-label', (wrap.previousElementSibling?.textContent || 'Tabela').trim().slice(0, 80) + ' — tabela com rolagem horizontal');
+  }
+}
+new MutationObserver(list => { for (const m of list) for (const n of m.addedNodes) if (n.nodeType === 1) a11yFix(n.parentElement || n); }).observe(document.body, { childList: true, subtree: true });
 const datalist = (id, arr) => `<datalist id="${id}">${arr.map(x => `<option value="${esc(x)}">`).join('')}</datalist>`;
 
 /* ---------- dados ---------- */
@@ -143,7 +159,7 @@ async function photoSheet(id, fromCam) {
   const f = await DB.get('fotos', id); if (!f) return;
   const all = (await DB.by('fotos', 'vistoriaId', f.vistoriaId)).sort(byTs); const n = all.findIndex(x => x.id === id) + 1;
   const nums = [...new Set((f.marks || []).filter(m => m.t === 'num').map(m => m.n))].sort((x, y) => x - y);
-  const el = modal(`<h2>Foto ${pad(n)}</h2><img class="big" src="${urlOf(f)}">
+  const el = modal(`<h2>Foto ${pad(n)}</h2><img class="big" src="${urlOf(f)}" alt="Foto ${pad(n)}${f.descricao ? ': ' + esc(f.descricao) : ''}">
     <div class="mut small">🕒 ${esc(Rep.fTs(f.ts))}<br>📍 ${esc(Rep.fLoc(f))}${f.origem === 'galeria' ? '<br>(importada da galeria)' : ''}</div>
     <button class="btn sec block" id="pcr" style="margin-top:10px">✂ Recortar para caber na meia folha${f.cortada ? ' (já recortada)' : ''}</button>
     <button class="btn sec block" id="pfit" style="margin-top:8px">↘ Diminuir foto para caber inteira${f.ajustada ? ' (já ajustada)' : ''}</button>
@@ -425,7 +441,7 @@ async function vVistoria(view, id) {
   if (tab === 'fotos') {
     tb.innerHTML = `<div class="row"><button class="btn grow" id="cam">${CGU.icon("camera")} Tirar foto</button><button class="btn sec grow" id="gal">${CGU.icon("image")} Da galeria</button></div>
       <p class="mut small">Fotos da câmera recebem data e hora do registro e GPS quando disponível. Fotos da galeria usam a data do arquivo e não recebem GPS${S.carimbo ? ', também gravadas na própria imagem' : ''}. Permita a localização quando o aparelho pedir.</p>
-      <div class="photos">${fotos.map((f, i) => `<div class="ph" data-p="${esc(f.id)}"><img src="${urlOf(f)}" loading="lazy"><b>${pad(i + 1)}</b><span class="gps">${f.lat != null ? '📍' : '—'}</span></div>`).join('')}</div>
+      <div class="photos">${fotos.map((f, i) => `<div class="ph" data-p="${esc(f.id)}"><img src="${urlOf(f)}" loading="lazy" alt="Foto ${pad(i + 1)}"><b>${pad(i + 1)}</b><span class="gps">${f.lat != null ? '📍' : '—'}</span></div>`).join('')}</div>
       ${fotos.length ? '' : '<div class="empty">Nenhuma foto ainda.</div>'}`;
     $('#cam').onclick = () => startCapture(v.id, 'cam'); $('#gal').onclick = () => startCapture(v.id, 'gal');
     tb.querySelectorAll('[data-p]').forEach(p => p.onclick = () => photoSheet(p.dataset.p, false));
@@ -489,7 +505,7 @@ async function constSheet(v, fotos, c) {
     <label>Ambiente</label><select data-f="ambiente">${optG(AMBIENTES, c.ambiente)}</select>
     ${fld('Local / elemento (detalhe)', 'local', c, { ph: 'Ex.: Pilar P12 – 2º pav.' })}${fld('Descrição', 'descricao', c, { area: 1, rows: 4 })}${fld('Recomendação', 'recomendacao', c, { area: 1, rows: 3 })}
     <label for="recurrence-link">Vínculo explícito com constatação anterior (opcional)</label><select id="recurrence-link"><option value="">Sem vínculo declarado</option>${preserved}${recurrence.rows.map(x=>`<option value="${esc(x.id)}" ${c.recorrenciaDeId===x.id?'selected':''}>${esc(x.label)}</option>`).join('')}</select><p class="mut small">Selecione somente se a relação foi confirmada por uma pessoa. A lista oferece constatações verificadas anteriores do mesmo edifício; o aplicativo não deduz recorrência pelo texto. ${recurrence.truncated?'Lista limitada a 300 constatações verificadas. ':''}O vínculo será congelado em novas emissões.</p>
-    <label>Fotos relacionadas (toque para marcar)</label><div class="photos" id="sp">${fotos.map((f, i) => `<div class="ph ${c.fotoIds.includes(f.id) ? 'sel' : ''}" data-id="${esc(f.id)}"><img src="${urlOf(f)}"><b>${pad(i + 1)}</b></div>`).join('') || '<span class="mut small">Tire fotos primeiro na aba Fotos.</span>'}</div>
+    <label>Fotos relacionadas (toque para marcar)</label><div class="photos" id="sp">${fotos.map((f, i) => `<div class="ph ${c.fotoIds.includes(f.id) ? 'sel' : ''}" data-id="${esc(f.id)}"><img src="${urlOf(f)}" alt="Foto ${pad(i + 1)}"><b>${pad(i + 1)}</b></div>`).join('') || '<span class="mut small">Tire fotos primeiro na aba Fotos.</span>'}</div>
     <div class="row" style="margin-top:14px"><button class="btn grow" id="ok">Salvar</button>${novo ? '' : '<button class="btn bad" id="dl">Excluir</button>'}<button class="btn ghost" id="x">Fechar</button></div>`);
   let tipoAnt = c.tipo;
   bindFields(el, c, () => { });
