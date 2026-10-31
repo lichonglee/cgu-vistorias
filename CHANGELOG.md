@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 1.10.1 · 30/10/2026
+
+- Corrige o dicionário local para explicitar os limites dos vínculos de recorrência, as datas usadas nas janelas, a associação de fotos no próprio snapshot e o escopo dos pares candidatos a duplicata.
+- A tabela documental passa a espelhar todas as definições do registro. Versão da regra: `cgu-local-indicators-1.0.1`.
+- Inclui o protótipo sintético do painel gerencial aprovado para demonstração e testes de regressão dos chamados, drafts por perfil e carrossel. O artefato fica fora do PWA e não implementa autenticação institucional ou persistência central.
+- Sem mudança no IndexedDB, snapshots ou backup. Cache PWA versionado como 1.10.1. PDF do manual continua pendente de regeneração e conferência.
+
 ## 1.10.0 · 30/10/2026
 
 - Painel local passa a apresentar fichas recolhíveis de definição, numerador, denominador, unidade, período, fonte, exclusões e limites dos indicadores. As definições são locais e provisórias; não foram homologadas pelo Product/Data Owner.

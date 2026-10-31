@@ -131,10 +131,34 @@ test('ruleVersion e referências aditivas de ficha são incluídos no resumo e n
   await assert.rejects(Export.gerarAgregado({ ...summary, ruleVersion: 'different-rules' }, { SnapshotLib }), /version mismatch/);
 });
 
+test('fichas explicitam limites de recorrência, janela, fotos e duplicatas', () => {
+  const recurrence = Registry.forKey('kpi.recurrence');
+  assert.match(recurrence.numerator, /formato UUID válido/);
+  assert.match(recurrence.denominator, /primeira emissão/);
+  assert.match(recurrence.exclusions, /não confirma se o destino existe/);
+  assert.match(recurrence.limits, /destino não conferido/);
+  const photo = Registry.forKey('kpi.photoAssociation');
+  assert.match(photo.source, /IDs das evidências do mesmo snapshot/);
+  assert.doesNotMatch(photo.source, /hash/i);
+  const coverage = Registry.get('local.coverage');
+  assert.match(coverage.window, /data atual editável/);
+  assert.match(coverage.exclusions, /sem data válida/);
+  const duplicates = Registry.get('local.duplicate-candidates');
+  assert.match(duplicates.source, /limitada a 200 pares/);
+  assert.match(duplicates.source, /obraId atual/);
+});
+
 test('versão da regra e hash da ficha congelam mudanças de definição', () => {
-  assert.equal(Registry.RULE_VERSION, 'cgu-local-indicators-1.0.0');
+  assert.equal(Registry.RULE_VERSION, 'cgu-local-indicators-1.0.1');
   const hash = crypto.createHash('sha256').update(JSON.stringify(Registry.list())).digest('hex');
-  assert.equal(hash, 'ba5d8a9c81ed0c38b59b5dc747d488b2cd682abea7dfd6259ec271227e2e795d');
+  assert.equal(hash, '3de84974a0f0b3ffbc8955ef4d22015afef9669fae318e051a501ac61bf23764');
+});
+
+test('fichas são definidas em uma única lista, sem overrides paralelos', () => {
+  const source = read('indicator-registry.js');
+  assert.match(source, /const raw = \[/);
+  assert.doesNotMatch(source, /const overrides\s*=/);
+  assert.doesNotMatch(source, /overrides\[item\.id\]/);
 });
 
 test('renderização escapa período e rótulos; tabela documental coincide com o registro', () => {

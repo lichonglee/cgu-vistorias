@@ -1,5 +1,5 @@
 /* Cache limitado a esta aplicação e a este caminho de hospedagem. */
-importScripts('brand.js?v=1.10.0');
+importScripts('brand.js?v=1.10.1');
 const PREFIX = 'cgu-vistorias-' + new URL(self.registration.scope).pathname + '-';
 const CACHE = PREFIX + CGU.version;
 const FILES = ['./', 'index.html', 'app.css', 'brand.js', 'app.js', 'db.js', 'emission-snapshot.js', 'taxonomia.js', 'indicator-registry.js', 'analytics.js', 'analytics-export.js', 'snapshot-diff.js', 'backup.js', 'report.js', 'manifest.webmanifest',

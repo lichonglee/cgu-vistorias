@@ -33,6 +33,9 @@ test('a distribuição usa X.Y.Z consistente no produto, HTML e manifesto de fer
  const manual=read('manual.html');
  assert.ok(manual.includes('<title>Manual do usuário | CGU Vistorias v'+identity.version+'</title>'));
  assert.ok(manual.includes('<span class="version">v'+identity.version+'</span>'));
+ const manualVersion=manual.match(/corresponde à versão (\d+\.\d+\.\d+)/);
+ assert.ok(manualVersion,'manual declares which app version it describes');
+ assert.equal(manualVersion[1],identity.version,'manual body version matches product version');
  assert.doesNotMatch(manual,/alt="[^"]*versão \d/,'capturas antigas não devem ser identificadas como telas da nova versão');
  // Atualizar esta declaração quando as capturas forem refeitas para uma versão posterior.
  assert.ok(read('LEIA-ME.md').includes('capturas de tela ainda são da versão 1.0.x'));
