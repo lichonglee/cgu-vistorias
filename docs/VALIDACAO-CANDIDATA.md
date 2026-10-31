@@ -120,3 +120,12 @@ Chrome headless via DevTools Protocol, emulação 390×844 com toque, perfis nov
 - Fila com 60 constatações Alta/Crítica de uma emissão oficial real: “Exibindo 1–50 de 60”, 50 linhas, Anterior desativado; Próximos → “51–60 de 60”, 10 linhas, Próximos desativado e foco movido para o texto da página; Anterior volta a 1–50. Filtro “Alta/Crítica sem ação declarada” mantém 1–50 de 60. “Abrir constatação” abriu a leitura do snapshot. Sem rolagem horizontal; sem erros de console. Base limpa ao final.
 - Duas abas reais no mesmo perfil: (a) aba antiga com formulário “+ Edifício” e texto não salvo; a outra aba abriu o IndexedDB v4 sem bloqueio; a aba antiga mostrou o aviso fixo `role=alert`, manteve modal e rascunho, inclusive após trocar a rota, e “Salvar” exibiu “Não salvo…”. (b) aba antiga segurando conexão v2; a aba nova mostrou o aviso de armazenamento; após fechar a antiga e recarregar, o app abriu normalmente.
 - Limites: emulação de navegador, não aparelho físico; sem leitor de tela.
+
+## Acessibilidade automática (axe-core) — 1.10.4 (Compasso, 31/10/2026)
+
+axe-core 4.10.2 com as regras WCAG 2.0/2.1 A e AA, Chrome headless 390×844, origem isolada 8791, dados fictícios. Resultados brutos em `work/qa-artifacts/compasso-axe-1.10.4/` (antes.json, depois.json).
+
+- Antes: `label` (crítico) em Dados, Conclusão, Painel e Ajustes; `select-name` (crítico) nos filtros; `color-contrast` (sério) em `.chip.ok` 3,72:1; `scrollable-region-focusable` (sério) nas tabelas do Painel; `image-alt` (crítico) no modal de foto.
+- Depois do commit de correção: 0 violações em 14 telas e modais (Edifícios, edifício, vistoria Dados/Fotos/Constatações/Conclusão/Emitir, comparar emissões, constatação, ação declarada, novo edifício, foto, Painel, Ajustes).
+- Revisão Sentinela: a correção dos rótulos é uma heurística em tempo de execução (rótulo → campo irmão seguinte), não altera os templates; telas novas podem regredir sem teste. Miniaturas com `alt` “Foto NN” repetem o número visível; cada tabela rolável vira uma região nomeada.
+- Limites: auditoria automática não substitui leitor de tela nem aparelho físico.
