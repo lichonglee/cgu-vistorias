@@ -1,6 +1,6 @@
 /* Identificação central do produto. Atualize version em cada lançamento. */
 const CGU = Object.freeze({
-  version: '1.10.2',
+  version: '1.10.3',
   updated: '30/10/2026',
   icon(name) {
     const paths = {

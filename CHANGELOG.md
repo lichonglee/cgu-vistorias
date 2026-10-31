@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## 1.10.3 · 30/10/2026
+
+- Corrige a importação de backups com foto recortada ou ajustada uma única vez a partir do original: o backup deixava de ser aceito por inteiro. A validação passa a aceitar o estado de recorte na foto ou na cópia original e continua rejeitando cópia original em foto não editada.
+- Sem mudança no IndexedDB, snapshots, indicadores ou formato do backup. Cache PWA versionado como 1.10.3. PDF do manual e ensaios em aparelho seguem pendentes.
+
 ## 1.10.2 · 30/10/2026
 
 - Endurece a análise local: auto-vínculo de recorrência é comparado sem distinção entre maiúsculas e minúsculas; constatações sem ID continuam no denominador, mas não entram no numerador.
