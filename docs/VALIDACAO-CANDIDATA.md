@@ -92,3 +92,15 @@ Origem isolada `127.0.0.1:8791`, dados fictícios, em desktop e em 390×844.
 - `validateAction` mantém a mesma regra e separa as mensagens: “Informe a função responsável.” para vazio ou só espaços; “Função responsável excede 120 caracteres.” acima do limite. Teste cobre vazio, espaços e 121 caracteres, sem gravação.
 - Navegador na origem isolada 8791: cache único `cgu-vistorias-/-1.10.4`; função só com espaços exibiu “Informe a função responsável.” e nada foi gravado; ação válida salva. Base limpa ao final.
 - `FAKE_IDB npm test` 131/131, `npm run check` 6/6. Revisão Sentinela aprovada.
+
+## Capturas visuais móveis — 1.10.4 (Compasso, 30/10/2026)
+
+Chrome headless via DevTools Protocol, emulação móvel 390×844 com toque, perfil novo; origem isolada `127.0.0.1:8791`; dados fictícios (duas emissões oficiais da mesma vistoria, Rev. 00 e Rev. 01). 12 capturas guardadas fora da distribuição em `work/qa-artifacts/compasso-1.10.4-mobile/` e conferidas visualmente.
+
+- Histórico de emissões: cartões Rev. 01 e Rev. 00 com integridade e arquivo original verificados e botão “Comparar com outra emissão”.
+- Comparação: modal com aviso, referência A, select B, “Comparar snapshots”; resultado “0 acrescentada(s), 0 removida(s), 1 alterada(s), 1 igual(is)”, detalhe do título alterado e evidências por SHA-256. Sem rolagem horizontal.
+- Painel: cartões de totais, indicadores com “Como é calculado”, barras das dimensões e de vistorias por mês, avisos de limites, lacunas cadastrais, exportação restrita, ações declaradas, filtros e agrupamentos; leitura do snapshot “Infiltração fictícia” (Crítica) com “Abrir registro atual”. scrollWidth = 390 em todas as telas.
+- Nenhuma exceção ou mensagem de erro/aviso no console. Base limpa ao final.
+- O aviso “O navegador não garantiu armazenamento persistente” aparece sobre o conteúdo durante alguns segundos no perfil headless; é o comportamento previsto do app quando `navigator.storage.persist()` é negado.
+- Observação de ambiente: com o perfil num caminho longo, o Chrome headless não abriu o IndexedDB (“Internal error opening backing store”) e o app ficou com a tela de Edifícios vazia, sem mensagem, e o Painel registrou erro de `S` nulo. Falha de ambiente, mas mostra que o app não informa ao usuário quando o IndexedDB não abre.
+- Limites: emulação de navegador, não aparelho físico; sem leitor de tela; paginação com uma página.
