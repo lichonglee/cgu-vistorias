@@ -66,3 +66,12 @@ Origem isolada `127.0.0.1:8791`, app 1.10.3, somente dados fictícios (edifício
 - Com a linha de emissão de A1 adulterada (número trocado), A1 deixou de ser oferecida como verificada; o vínculo existente apareceu como “Vínculo preservado; constatação anterior fora da lista”, ainda selecionado. A adulteração foi revertida.
 - Backup real (156 KB) → limpeza das sete stores → importação real: 15 novos, 0 conflitos, 0 snapshots ou arquivos ausentes; 3 emissões, 3 snapshots e 3 arquivos restaurados; vínculo preservado; A1 voltou a ser oferecida como verificada e AF/B1 seguiram excluídas. Base vazia ao final.
 - Limites: viewport desktop; acessibilidade móvel, leitor de tela e console do navegador não foram exercitados nesta rodada.
+
+## Smoke móvel por DOM — 1.10.3 (Compasso, 30/10/2026)
+
+Portal 390×844 (viewport CSS 375 px) na origem isolada `127.0.0.1:8791`, dados fictícios. Duas emissões oficiais reais da mesma vistoria (Rev. 00 e Rev. 01 após editar a constatação).
+
+- Aba Emitir: dois botões “Comparar com outra emissão” com `aria-label` descritivo. Modal de comparação abriu, listou a emissão B e “Comparar snapshots” gerou o resultado; sem rolagem horizontal da página (scrollWidth = clientWidth = 375).
+- Painel: indicadores, 15 `details`, paginação “Exibindo 1–1 de 1”, avisos de limite; “Abrir constatação” abriu a leitura do snapshot Rev. 1 com foco dentro do modal. Página sem rolagem horizontal; as abas e as duas tabelas que excedem a largura ficam dentro de contêineres com `overflow-x: auto`.
+- Nenhum erro de `window.onerror`, rejeição não tratada ou `console.error` durante o roteiro. Base limpa ao final.
+- Limites: captura de tela indisponível (janela do portal minimizada), portanto sem conferência visual; paginação com uma página apenas; teclado/toque, leitor de tela e aparelho físico não exercitados; barras do painel não identificadas por seletor.
