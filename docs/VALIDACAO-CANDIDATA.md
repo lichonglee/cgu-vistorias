@@ -75,3 +75,14 @@ Portal 390×844 (viewport CSS 375 px) na origem isolada `127.0.0.1:8791`, dados 
 - Painel: indicadores, 15 `details`, paginação “Exibindo 1–1 de 1”, avisos de limite; “Abrir constatação” abriu a leitura do snapshot Rev. 1 com foco dentro do modal. Página sem rolagem horizontal; as abas e as duas tabelas que excedem a largura ficam dentro de contêineres com `overflow-x: auto`.
 - Nenhum erro de `window.onerror`, rejeição não tratada ou `console.error` durante o roteiro. Base limpa ao final.
 - Limites: captura de tela indisponível (janela do portal minimizada), portanto sem conferência visual; paginação com uma página apenas; teclado/toque, leitor de tela e aparelho físico não exercitados; barras do painel não identificadas por seletor.
+
+## Ações corretivas declaradas — 1.10.3 (Compasso, 30/10/2026)
+
+Origem isolada `127.0.0.1:8791`, dados fictícios, em desktop e em 390×844.
+
+- Constatação sem emissão: sem botão de nova ação e com a orientação para emitir em snapshot verificável.
+- Após emissão oficial real: aviso “Declarações locais do usuário; não verificadas”; formulário com função, prazo, estado (aberta, em execução, concluída, cancelada) e observação. Salvar vazio foi recusado sem gravar nada.
+- Ação salva com estado “em execução”, função, prazo e `snapshotId`; mensagem “permanece não verificada”. Observação com `<img src=x onerror=...>` apareceu como texto na lista e no painel, sem elemento injetado.
+- Painel: seção de ações declaradas com 0/1 concluídas e rótulo de não verificadas. Em 390×844, sem rolagem horizontal da página. Nenhum erro de console. Base limpa ao final.
+- Observação de UX: ao salvar com a função vazia, a mensagem diz “Função responsável inválida (máximo 120 caracteres)”, sem citar que o campo é obrigatório.
+- Limites: sem captura visual, teclado/toque, leitor de tela ou aparelho físico.
