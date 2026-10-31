@@ -17,7 +17,10 @@ const DB = (() => {
         if (!d.objectStoreNames.contains('snapshots')) { const sn = d.createObjectStore('snapshots', { keyPath: 'id' }); sn.createIndex('vistoriaId', 'vistoriaId'); sn.createIndex('emissaoId', 'emissaoId'); }
         if (!d.objectStoreNames.contains('acoes')) { const ac = d.createObjectStore('acoes', { keyPath: 'id' }); ac.createIndex('vistoriaId', 'vistoriaId'); ac.createIndex('constatacaoId', 'constatacaoId'); ac.createIndex('snapshotId', 'snapshotId'); }
       };
-      r.onsuccess = () => { db = r.result; res(); };
+      /* Outra aba com versão antiga segura a atualização: falha visível em vez de promessa pendente; a conexão aberta
+         cede quando uma versão mais nova pede o banco, para não bloquear outras abas. */
+      r.onblocked = () => { const e = new Error('Atualização do armazenamento bloqueada por outra aba aberta do aplicativo.'); e.name = 'BlockedError'; rej(e); };
+      r.onsuccess = () => { db = r.result; db.onversionchange = () => { db.close(); if (typeof dispatchEvent === 'function' && typeof Event === 'function') dispatchEvent(new Event('cgu-db-versionchange')); }; res(); };
       r.onerror = () => rej(r.error);
     });
   }

@@ -4,6 +4,7 @@
 
 - Ações declaradas: salvar com a função responsável vazia passa a informar que o campo é obrigatório; o limite de 120 caracteres tem mensagem própria. Nenhuma regra de validação mudou.
 - Se o armazenamento local do navegador não abrir, o aplicativo mostra um aviso com orientação em vez de uma tela vazia; as rotas não sobrescrevem esse aviso.
+- Atualização do armazenamento bloqueada por outra aba aberta passa a mostrar o mesmo aviso; abas antigas liberam o banco quando uma versão nova o solicita e pedem recarga. Em falha de armazenamento o service worker não é registrado nessa visita.
 - Manual PDF regenerado a partir do manual HTML 1.10.4 (19 páginas); as capturas de tela seguem identificadas como ilustrativas de versões anteriores.
 - Sem mudança no IndexedDB, snapshots, indicadores ou backup. Cache PWA versionado como 1.10.4.
 

@@ -865,6 +865,10 @@ $('#impIn').addEventListener('change', async e => {
 /* ---------- início ---------- */
 let deferredInstall = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
+addEventListener('cgu-db-versionchange', () => {
+  S = null;
+  $('#view').innerHTML = '<div class="warnbox"><b>O aplicativo foi atualizado em outra aba.</b> Esta aba deixou de acessar os registros para não bloquear a atualização. Recarregue a página para continuar.</div>';
+});
 (async () => {
   try { await DB.open(); await loadSettings(); await loadLogo(); }
   catch (e) {
