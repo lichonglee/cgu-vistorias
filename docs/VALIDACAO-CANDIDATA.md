@@ -56,3 +56,13 @@ Origem isolada `127.0.0.1:8791` servindo esta candidata, com service worker e ca
 - Após a correção 53502c4: `exportBackup` real gerou o JSON com `cropBackup` em data URL; os registros foram excluídos; a importação pelo `#impIn` real criou 3 registros novos, sem conflitos; a foto voltou com o recorte 40×30 e o original 80×60 no `cropBackup`; o botão “↩ Desfazer recorte” restaurou o original 80×60 e removeu o `cropBackup`. A base terminou vazia.
 - Limites: o recorte foi semeado no formato gravado pelo app, sem arrastar a seleção na tela; o arquivo foi entregue ao input por `DataTransfer`; Chromium desktop, sem aparelho Android.
 - `FAKE_IDB npm test` 130/130, `npm run check` 6/6. Revisão Sentinela aprovada.
+
+## Seletor de recorrência e roundtrip — 1.10.3 (Compasso, 30/10/2026)
+
+Origem isolada `127.0.0.1:8791`, app 1.10.3, somente dados fictícios (edifícios A e B). Três emissões oficiais reais (`emitir`, VT/PDF) para A1 (01/09), AF (01/11) e B1 (01/09); vistoria atual A2 em 15/10.
+
+- O editor de constatação de A2 ofereceu exatamente uma opção: “2026-09-01 · Edifício fictício QA A · A1 anterior”. Não ofereceu a vistoria posterior AF nem a de outro edifício B1. O rótulo está associado ao select (`label for`).
+- Seleção humana salva: `recorrenciaDeId` gravado com o ID de A1.
+- Com a linha de emissão de A1 adulterada (número trocado), A1 deixou de ser oferecida como verificada; o vínculo existente apareceu como “Vínculo preservado; constatação anterior fora da lista”, ainda selecionado. A adulteração foi revertida.
+- Backup real (156 KB) → limpeza das sete stores → importação real: 15 novos, 0 conflitos, 0 snapshots ou arquivos ausentes; 3 emissões, 3 snapshots e 3 arquivos restaurados; vínculo preservado; A1 voltou a ser oferecida como verificada e AF/B1 seguiram excluídas. Base vazia ao final.
+- Limites: viewport desktop; acessibilidade móvel, leitor de tela e console do navegador não foram exercitados nesta rodada.
