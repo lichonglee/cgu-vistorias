@@ -47,3 +47,12 @@ Ensaio em navegador real na origem 8767, com `db.js` carregado da candidata e ba
 - Vistoria inexistente rejeita e o contador permanece 24.
 
 Limite mantido: a numeração é local ao aparelho e não é única entre aparelhos. Fora do escopo desta rodada: PDF/DOCX ponta a ponta com a nova numeração e WebP no navegador.
+
+## Backup com recorte e Desfazer recorte — 1.10.2 + 53502c4 (Compasso, 30/10/2026)
+
+Origem isolada `127.0.0.1:8791` servindo esta candidata, com service worker e caches da origem limpos antes do ensaio; somente dados fictícios.
+
+- Com o formato que `app.js` grava no primeiro recorte (cropBackup com `cortada`/`ajustada` indefinidos), a importação falhava inteira: “cropBackup sem estado de recorte/ajuste”. Nenhum registro era importado.
+- Após a correção 53502c4: `exportBackup` real gerou o JSON com `cropBackup` em data URL; os registros foram excluídos; a importação pelo `#impIn` real criou 3 registros novos, sem conflitos; a foto voltou com o recorte 40×30 e o original 80×60 no `cropBackup`; o botão “↩ Desfazer recorte” restaurou o original 80×60 e removeu o `cropBackup`. A base terminou vazia.
+- Limites: o recorte foi semeado no formato gravado pelo app, sem arrastar a seleção na tela; o arquivo foi entregue ao input por `DataTransfer`; Chromium desktop, sem aparelho Android.
+- `FAKE_IDB npm test` 130/130, `npm run check` 6/6. Revisão Sentinela aprovada.
