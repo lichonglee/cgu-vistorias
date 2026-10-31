@@ -36,9 +36,11 @@ test('a distribuição usa X.Y.Z consistente no produto, HTML e manifesto de fer
  const manualVersion=manual.match(/corresponde à versão (\d+\.\d+\.\d+)/);
  assert.ok(manualVersion,'manual declares which app version it describes');
  assert.equal(manualVersion[1],identity.version,'manual body version matches product version');
- assert.doesNotMatch(manual,/alt="[^"]*versão \d/,'capturas antigas não devem ser identificadas como telas da nova versão');
- // Atualizar esta declaração quando as capturas forem refeitas para uma versão posterior.
- assert.ok(read('LEIA-ME.md').includes('capturas de tela ainda são da versão 1.0.x'));
+ // As capturas foram refeitas na versão atual: legendas, LEIA-ME e link do PDF declaram essa versão e nada as dá como antigas.
+ assert.ok(manual.includes('Tela da versão '+identity.version+' com dados fictícios.'));
+ assert.ok(!manual.includes('Tela ilustrativa') && !/desatualizad/.test(manual),'manual sem aviso de telas ou PDF antigos');
+ assert.ok(manual.includes('Baixar manual em PDF (versão '+identity.version+')'));
+ assert.ok(read('LEIA-ME.md').includes('capturas de tela foram refeitas na versão '+identity.version));
  assert.ok(manual.includes('O bloco analítico usa snapshots verificáveis'));
  assert.ok(manual.includes('GPS, snapshots, arquivos PDF/DOCX emitidos e ações declaradas'));
  assert.ok(manual.includes('esquema v3'));
@@ -58,7 +60,6 @@ test('a distribuição usa X.Y.Z consistente no produto, HTML e manifesto de fer
  assert.ok(read('CHANGELOG.md').includes('## 1.5.0 · 30/10/2026'));
  assert.ok(read('CHANGELOG.md').includes('A versão 1.3.0 rejeita o novo campo opcional'));
  assert.ok(manual.includes('responsável técnico/CREA e usuário) são incluídos nos snapshots'));
- assert.ok(manual.includes('Baixar manual em PDF (versão 1.0.x; desatualizado)'));
  assert.ok(read('CHANGELOG.md').startsWith('# Histórico de versões\n\n## '+identity.version+' · '));
 });
 

@@ -10,7 +10,7 @@ Branch `codex/release-candidate-1.1.0`, 46 commits sobre `origin/main` 1.0.6 (c7
 - PWA: o cache versionado 1.10.4 substitui o anterior na atualização do service worker (verificado no navegador); aviso quando o armazenamento local não abre ou a atualização é bloqueada por outra aba; aba antiga preserva tela e rascunho e avisa “Não salvo…”.
 - GPS da foto da câmera: nova leitura, espera pela resposta ao pedido de localização (até 30 s) e leitura até 15 s após a resposta; depois segue sem coordenadas com “Sem GPS” (decisões do usuário).
 - Acessibilidade: rótulos ligados aos campos, tabelas roláveis com foco e nome, texto alternativo nas fotos, contraste das etiquetas ≥ 4,5:1.
-- Manual HTML e PDF (20 páginas) da 1.10.4; capturas de tela identificadas como ilustrativas de versões anteriores.
+- Manual HTML e PDF (20 páginas) da 1.10.4; 12 capturas de tela refeitas na versão 1.10.4 com dados fictícios.
 
 ## Verificação
 
@@ -31,7 +31,6 @@ App instalado só em retrato; GPS da foto com resposta até 30 s e leitura até 
 - Numeração local sem unicidade entre aparelhos; integridade é consistência local, não assinatura nem autoria.
 - Backup JSON sem cifra; PIN é barreira de interface, não autenticação.
 - Retenção/descarte de snapshots e arquivos emitidos órfãos sem política (decisão do dono).
-- Capturas do manual ainda de versões anteriores.
 - Gates institucionais (S0–S4): contrato de dados, rubrica de risco, privacidade de agregados, metas, servidor com RBAC/IdP e hospedagem aprovada. Repositório privado não implica Pages privado (`docs/HOSPEDAGEM-E-PRIVACIDADE.md`).
 
 ## Para lançar (quando aprovado)
