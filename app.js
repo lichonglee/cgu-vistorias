@@ -327,6 +327,7 @@ function route() { const my = ++token; chain = chain.then(() => my === token ? d
 async function doRoute() {
   const my = token; const h = location.hash.replace(/^#\/?/, '').split('/');
   const view = $('#view'); const R = h[0] || 'obras';
+  if (!S) return; /* armazenamento local não abriu: mantém o aviso da inicialização */
   try {
     const routeId = decodeRouteSegment(h[1]);
     if (h[1] && routeId === null) { location.hash = '#/'; return; }
@@ -865,7 +866,12 @@ $('#impIn').addEventListener('change', async e => {
 let deferredInstall = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
 (async () => {
-  await DB.open(); await loadSettings(); await loadLogo();
+  try { await DB.open(); await loadSettings(); await loadLogo(); }
+  catch (e) {
+    console.error(e); S = null;
+    $('#view').innerHTML = '<div class="warnbox"><b>Não foi possível abrir o armazenamento local deste navegador.</b> Os registros não foram apagados, mas não podem ser lidos agora. Feche outras abas do aplicativo, confira se o navegador permite armazenar dados deste site, se há espaço livre no aparelho e recarregue a página.</div>';
+    return;
+  }
   if (navigator.storage?.persist) navigator.storage.persist().then(ok=>{if(!ok)toast('O navegador não garantiu armazenamento persistente. Exporte backup regularmente.',6000);}).catch(()=>toast('Não foi possível confirmar armazenamento persistente. Exporte backup regularmente.',6000));
   document.querySelector('#version').textContent = `v${CGU.version} · ${CGU.updated}`;
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => { });
