@@ -876,8 +876,8 @@ addEventListener('cgu-db-versionchange', () => {
   document.body.append(aviso);
 });
 /* Sem banco, gravações falham com InvalidStateError fora de qualquer try: avisa a cada tentativa em vez de falhar em silêncio. */
-addEventListener('unhandledrejection', () => {
-  if ($('#db-gone')) toast('Não salvo: esta aba perdeu o acesso aos registros. Copie o texto e recarregue a página.', 6000);
+addEventListener('unhandledrejection', e => {
+  if ($('#db-gone') && e.reason?.name === 'InvalidStateError') toast('Não salvo: esta aba perdeu o acesso aos registros. Copie o texto e recarregue a página.', 6000);
 });
 (async () => {
   try { await DB.open(); await loadSettings(); await loadLogo(); }
