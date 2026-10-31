@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0.0",
+  "baseline": "c742fcbb44bcc24936169c1529fddde98545550d",
+  "files": [
+    {
+      "file": "docx.iife.js",
+      "bytes": 1123332,
+      "sha256": "d5ec4f5a8b99740845974f5f6f020d6e5b1b6c27026195befc67eb37035c84c7",
+      "upstreamVersion": null
+    },
+    {
+      "file": "pdf-lib.min.js",
+      "bytes": 525099,
+      "sha256": "0f9a5cad07941f0826586c94e089d89b918c46e5c17cf2d5a3c6f666e3bc694f",
+      "upstreamVersion": null
+    }
+  ]
+}

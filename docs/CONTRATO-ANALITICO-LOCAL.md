@@ -1,0 +1,13 @@
+# Contrato analítico local `cgu-local-analytics-v1`
+
+Este contrato opera somente sobre dados deste aparelho e snapshots locais verificáveis. Não representa carteira institucional, não atribui risco e não usa backend. A interface oferece 12 meses, 24 meses ou todo o histórico. Em janelas limitadas, a data da vistoria deve ser ISO válida e estar entre o primeiro dia do mês inicial e `asOf`, inclusive; datas ausentes/inválidas ficam fora e são contadas em `undatedInspectionsExcluded`. Todo o histórico inclui registros sem data, que aparecem na dimensão `Data ausente`.
+
+Cobertura é definida como edifícios do inventário local atual com ao menos um snapshot selecionado verificável na janela, dividido por edifícios cadastrados localmente. Numeradores analíticos usam a vistoria representada pelo snapshot; o denominador do inventário não é temporal. A seleção de revisão existente permanece: revisão, data local e desempate determinístico; divergência da revisão mais recente não retrocede para revisão anterior.
+
+Os códigos `SIS.*` e `AMB.*` vêm de `taxonomia.js`, versão `cgu-app-taxonomia-1`. São internos ao app, derivados de rótulos da interface e não aprovados institucionalmente. Rótulos desconhecidos viram “sem correspondência”, sem ecoar o texto recebido. Essa derivação não altera IndexedDB nem snapshots.
+
+`duplicateCandidates` lista pares locais que coincidem em edifício, data e hash SHA-256 da projeção estruturada das constatações. São apenas candidatos; não há merge nem alteração automática. `dataGaps` lista campos ausentes/inválidos no cadastro local e IDs para investigação; essa lista cobre o registro local completo, mesmo quando a análise está em uma janela limitada. A lista pode identificar registros e não deve ser exportada como dado agregado.
+
+`analytics-export.js` oferece duas exportações após confirmação explícita. `cgu-local-analytics-v1` contém apenas contagens/KPIs/dimensões allowlisted, janela e versão da taxonomia. `cgu-migration-manifest-v1` contém completude e metadados de proveniência; IDs estáveis são omitidos por padrão e só entram com opção explícita. Ambos usam canonicalização `SnapshotLib.canonicalize`; SHA-256 cobre o objeto sem o próprio campo `sha256`. Não incluem texto livre, nomes, GPS, fotos ou evidências. São arquivos locais de classe restrita; não compartilhar ou centralizar sem aprovação de privacidade. Não há limiar k aprovado.
+
+Não existe ação corretiva estruturada, recorrência confirmada, consolidação multiunidade, inventário oficial, RBAC/IdP, numeração central nem rubrica de risco nesta fatia. Nenhuma saída pode ser rotulada como score ou decisão de risco.
