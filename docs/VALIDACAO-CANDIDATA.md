@@ -104,3 +104,11 @@ Chrome headless via DevTools Protocol, emulação móvel 390×844 com toque, per
 - O aviso “O navegador não garantiu armazenamento persistente” aparece sobre o conteúdo durante alguns segundos no perfil headless; é o comportamento previsto do app quando `navigator.storage.persist()` é negado.
 - Observação de ambiente: com o perfil num caminho longo, o Chrome headless não abriu o IndexedDB (“Internal error opening backing store”) e o app ficou com a tela de Edifícios vazia, sem mensagem, e o Painel registrou erro de `S` nulo. Falha de ambiente, mas mostra que o app não informa ao usuário quando o IndexedDB não abre.
 - Limites: emulação de navegador, não aparelho físico; sem leitor de tela; paginação com uma página.
+
+## Falha ao abrir o armazenamento local — 1.10.4 (Compasso, 30/10/2026)
+
+- 15c5a6a: se `DB.open`/`loadSettings` falham, a inicialização mostra aviso estático com orientação e as rotas não o sobrescrevem. Antes: rejeição não tratada, tela de Edifícios vazia e erro de `S` nulo no Painel. Chrome headless 390×844 com IndexedDB indisponível (“Internal error opening backing store”): aviso visível, Painel sem sobrescrever, sem exceções; perfil normal: Edifícios e Painel normais.
+- 1167fc5: atualização de esquema bloqueada por aba antiga rejeita com `BlockedError` (mesmo aviso) em vez de ficar pendente; a conexão aberta fecha em `versionchange` e a aba antiga mostra “O aplicativo foi atualizado em outra aba… Recarregue”. `tests/db-open.test.js` cobre os dois casos e falha com o `db.js` anterior (mutação reproduzida por Compasso e por Sentinela).
+- `FAKE_IDB npm test` 134/134, `npm run check` 6/6. Revisões Sentinela aprovadas.
+- Pendências apontadas na revisão (baixas): na aba antiga, o aviso de `versionchange` substitui a tela e campos ainda não salvos se perdem; um modal aberto pode ficar sobre o aviso; o listener do app e o `dispatchEvent` não têm teste automatizado; após `BlockedError` a requisição pode concluir mais tarde e a página segue no aviso até recarregar; em falha o service worker não é registrado nessa visita. Ensaio manual com duas abas reais segue pendente.
+- O conteúdo de `app.js`/`db.js` mudou depois dos primeiros ensaios com cache 1.10.4 na origem isolada 8791; como a 1.10.4 não foi lançada, origens de QA com esse cache devem limpar caches antes de novo ensaio.
