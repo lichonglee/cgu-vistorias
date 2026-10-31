@@ -111,3 +111,12 @@ test('interface deixa claro que ação é declarada, não altera snapshot, e bac
   const snapshotSource=fs.readFileSync(path.join(__dirname,'..','emission-snapshot.js'),'utf8');
   assert.doesNotMatch(snapshotSource,/\bacoes\b|rowVersion/);
 });
+
+test('função responsável vazia e longa têm mensagens distintas e nada é gravado',{skip},async()=>{
+  const db=fresh();await db.open();
+  for(const [responsavelFuncao,message] of [['',/Informe a função responsável/],['   ',/Informe a função responsável/],['x'.repeat(121),/excede 120 caracteres/]]){
+    const a=makeAction({responsavelFuncao});await seedLink(db,a);
+    await assert.rejects(()=>db.putAcao(a,0),message);
+  }
+  assert.deepEqual(await db.all('acoes'),[]);
+});

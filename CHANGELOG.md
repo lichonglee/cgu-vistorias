@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## 1.10.4 · 30/10/2026
+
+- Ações declaradas: salvar com a função responsável vazia passa a informar que o campo é obrigatório; o limite de 120 caracteres tem mensagem própria. Nenhuma regra de validação mudou.
+- Sem mudança no IndexedDB, snapshots, indicadores ou backup. Cache PWA versionado como 1.10.4.
+
 ## 1.10.3 · 30/10/2026
 
 - Corrige a importação de backups com foto recortada ou ajustada uma única vez a partir do original: o backup deixava de ser aceito por inteiro. A validação passa a aceitar o estado de recorte na foto ou na cópia original e continua rejeitando cópia original em foto não editada.

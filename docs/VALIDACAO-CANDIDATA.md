@@ -84,5 +84,11 @@ Origem isolada `127.0.0.1:8791`, dados fictícios, em desktop e em 390×844.
 - Após emissão oficial real: aviso “Declarações locais do usuário; não verificadas”; formulário com função, prazo, estado (aberta, em execução, concluída, cancelada) e observação. Salvar vazio foi recusado sem gravar nada.
 - Ação salva com estado “em execução”, função, prazo e `snapshotId`; mensagem “permanece não verificada”. Observação com `<img src=x onerror=...>` apareceu como texto na lista e no painel, sem elemento injetado.
 - Painel: seção de ações declaradas com 0/1 concluídas e rótulo de não verificadas. Em 390×844, sem rolagem horizontal da página. Nenhum erro de console. Base limpa ao final.
-- Observação de UX: ao salvar com a função vazia, a mensagem diz “Função responsável inválida (máximo 120 caracteres)”, sem citar que o campo é obrigatório.
+- Observação de UX: ao salvar com a função vazia, a mensagem dizia “Função responsável inválida (máximo 120 caracteres)”, sem citar que o campo é obrigatório. Corrigido na 1.10.4 (ver seção seguinte).
 - Limites: sem captura visual, teclado/toque, leitor de tela ou aparelho físico.
+
+## Mensagem de função responsável — 1.10.4 (Compasso, 30/10/2026)
+
+- `validateAction` mantém a mesma regra e separa as mensagens: “Informe a função responsável.” para vazio ou só espaços; “Função responsável excede 120 caracteres.” acima do limite. Teste cobre vazio, espaços e 121 caracteres, sem gravação.
+- Navegador na origem isolada 8791: cache único `cgu-vistorias-/-1.10.4`; função só com espaços exibiu “Informe a função responsável.” e nada foi gravado; ação válida salva. Base limpa ao final.
+- `FAKE_IDB npm test` 131/131, `npm run check` 6/6. Revisão Sentinela aprovada.

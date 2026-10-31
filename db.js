@@ -37,7 +37,8 @@ const DB = (() => {
     const allowed=['id','constatacaoId','vistoriaId','snapshotId','responsavelFuncao','prazo','estado','concluidaEm','observacao','criadoEm','atualizadoEm','rowVersion'];
     if(Object.keys(a).some(k=>!allowed.includes(k))||Object.getPrototypeOf(a)!==Object.prototype)throw new TypeError('A ação contém campo inválido.');
     if (!ACTION_UUID.test(a.id || '') || !ACTION_UUID.test(a.constatacaoId || '') || !(ACTION_UUID.test(a.vistoriaId || '') || ACTION_LEGACY_ID.test(a.vistoriaId || '')) || !ACTION_UUID.test(a.snapshotId || '')) throw new TypeError('IDs da ação inválidos.');
-    if (typeof a.responsavelFuncao !== 'string' || !a.responsavelFuncao.trim() || a.responsavelFuncao.length > 120) throw new TypeError('Função responsável inválida (máximo 120 caracteres).');
+    if (typeof a.responsavelFuncao !== 'string' || !a.responsavelFuncao.trim()) throw new TypeError('Informe a função responsável.');
+    if (a.responsavelFuncao.length > 120) throw new TypeError('Função responsável excede 120 caracteres.');
     if (typeof a.prazo !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(a.prazo) || new Date(`${a.prazo}T00:00:00Z`).toISOString().slice(0,10) !== a.prazo) throw new TypeError('Prazo inválido.');
     if (!ACTION_STATES.includes(a.estado)) throw new TypeError('Estado da ação inválido.');
     if (typeof a.observacao !== 'string' || a.observacao.length > 500) throw new TypeError('Observação excede 500 caracteres.');
