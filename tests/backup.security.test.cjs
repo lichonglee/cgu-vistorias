@@ -188,3 +188,18 @@ test('DB.delVistoria atomically removes existing photos and blocks a pending put
   assert.equal(stores.get('vistorias')?.has(vistoriaId)||false,false);
   assert.equal([...stores.get('fotos').values()].some(f=>f.vistoriaId===vistoriaId),false);
 });
+test('cropBackup of a first crop (original without cortada/ajustada) is accepted; cropBackup on an unedited photo is rejected',async()=>{
+  const obra={id:U(),nome:'Obra',criadoEm:1}, vistoria={id:U(),obraId:obra.id,local:'Sala',status:'rascunho',constatacoes:[]};
+  const toData=async b=>'data:'+b.type+';base64,'+Buffer.from(await b.arrayBuffer()).toString('base64');
+  const original=new Blob([Buffer.from([255,216,255,1])],{type:'image/jpeg'}), cropped=new Blob([Buffer.from([255,216,255,2])],{type:'image/jpeg'});
+  /* Formato gravado por app.js no primeiro recorte: cropBackup copia cortada/ajustada da foto original, ainda indefinidos. */
+  const photo={id:U(),vistoriaId:vistoria.id,blob:cropped,w:10,h:5,cortada:true,notas:[],cropBackup:{blob:original,base:undefined,marks:undefined,notas:undefined,stampLines:undefined,w:20,h:10,cortada:undefined,ajustada:undefined}};
+  const jsonPhoto=JSON.parse(JSON.stringify(await Backup.photoJson(photo,toData)));
+  const d={...base(),obras:[obra],vistorias:[vistoria],fotos:[jsonPhoto]};
+  const checked=await Backup.validate(d,JSON.stringify(d).length,S);
+  assert.equal(checked.data.fotos.length,1);
+  const restored=Backup.decodePhoto(jsonPhoto);
+  assert.deepEqual(Buffer.from(await restored.cropBackup.blob.arrayBuffer()),Buffer.from([255,216,255,1]));
+  const unedited=JSON.parse(JSON.stringify(d));delete unedited.fotos[0].cortada;
+  await assert.rejects(()=>Backup.validate(unedited,JSON.stringify(unedited).length,S),/sem recorte\/ajuste/);
+});
