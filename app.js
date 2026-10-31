@@ -339,7 +339,7 @@ async function doRoute() {
     else location.hash = '#/';
   } catch (e) { console.error(e); view.innerHTML = `<div class="warnbox">Erro ao abrir a tela: ${esc(e.message)}</div>`; }
 }
-window.addEventListener('hashchange', () => { closeModal(); route(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { if (!S) return; closeModal(); route(); window.scrollTo(0, 0); });
 
 /* ---------- OBRAS ---------- */
 async function vObras(view) {
@@ -865,9 +865,15 @@ $('#impIn').addEventListener('change', async e => {
 /* ---------- início ---------- */
 let deferredInstall = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
+/* Outra aba abriu versão nova do banco e esta conexão foi fechada. Tela e modal ficam abertos para copiar o que não foi
+   salvo; o aviso fica acima de tudo e novas rotas deixam de renderizar. */
 addEventListener('cgu-db-versionchange', () => {
   S = null;
-  $('#view').innerHTML = '<div class="warnbox"><b>O aplicativo foi atualizado em outra aba.</b> Esta aba deixou de acessar os registros para não bloquear a atualização. Recarregue a página para continuar.</div>';
+  if ($('#db-gone')) return;
+  const aviso = document.createElement('div');
+  aviso.id = 'db-gone'; aviso.className = 'warnbox db-gone'; aviso.setAttribute('role', 'alert');
+  aviso.innerHTML = '<b>O aplicativo foi atualizado em outra aba.</b> Esta aba não salva mais alterações. Copie o que ainda não foi salvo e recarregue a página.';
+  document.body.append(aviso);
 });
 (async () => {
   try { await DB.open(); await loadSettings(); await loadLogo(); }
