@@ -112,3 +112,11 @@ Chrome headless via DevTools Protocol, emulação móvel 390×844 com toque, per
 - `FAKE_IDB npm test` 134/134, `npm run check` 6/6. Revisões Sentinela aprovadas.
 - Pendências apontadas na revisão (baixas): na aba antiga, o aviso de `versionchange` substitui a tela e campos ainda não salvos se perdem; um modal aberto pode ficar sobre o aviso; o listener do app e o `dispatchEvent` não têm teste automatizado; após `BlockedError` a requisição pode concluir mais tarde e a página segue no aviso até recarregar; em falha o service worker não é registrado nessa visita. Ensaio manual com duas abas reais segue pendente.
 - O conteúdo de `app.js`/`db.js` mudou depois dos primeiros ensaios com cache 1.10.4 na origem isolada 8791; como a 1.10.4 não foi lançada, origens de QA com esse cache devem limpar caches antes de novo ensaio.
+
+## Paginação da fila de acompanhamento e duas abas reais — 1.10.4 (Compasso, 30/10/2026)
+
+Chrome headless via DevTools Protocol, emulação 390×844 com toque, perfis novos em caminho curto, origem isolada `127.0.0.1:8791`, dados fictícios. Capturas em `work/qa-artifacts/compasso-1.10.4-mobile/` (p1–p3, 08, 10, 11).
+
+- Fila com 60 constatações Alta/Crítica de uma emissão oficial real: “Exibindo 1–50 de 60”, 50 linhas, Anterior desativado; Próximos → “51–60 de 60”, 10 linhas, Próximos desativado e foco movido para o texto da página; Anterior volta a 1–50. Filtro “Alta/Crítica sem ação declarada” mantém 1–50 de 60. “Abrir constatação” abriu a leitura do snapshot. Sem rolagem horizontal; sem erros de console. Base limpa ao final.
+- Duas abas reais no mesmo perfil: (a) aba antiga com formulário “+ Edifício” e texto não salvo; a outra aba abriu o IndexedDB v4 sem bloqueio; a aba antiga mostrou o aviso fixo `role=alert`, manteve modal e rascunho, inclusive após trocar a rota, e “Salvar” exibiu “Não salvo…”. (b) aba antiga segurando conexão v2; a aba nova mostrou o aviso de armazenamento; após fechar a antiga e recarregar, o app abriu normalmente.
+- Limites: emulação de navegador, não aparelho físico; sem leitor de tela.
