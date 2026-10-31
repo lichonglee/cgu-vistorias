@@ -129,3 +129,12 @@ axe-core 4.10.2 com as regras WCAG 2.0/2.1 A e AA, Chrome headless 390×844, ori
 - Depois do commit de correção: 0 violações em 14 telas e modais (Edifícios, edifício, vistoria Dados/Fotos/Constatações/Conclusão/Emitir, comparar emissões, constatação, ação declarada, novo edifício, foto, Painel, Ajustes).
 - Revisão Sentinela: a correção dos rótulos é uma heurística em tempo de execução (rótulo → campo irmão seguinte), não altera os templates; telas novas podem regredir sem teste. Miniaturas com `alt` “Foto NN” repetem o número visível; cada tabela rolável vira uma região nomeada.
 - Limites: auditoria automática não substitui leitor de tela nem aparelho físico.
+
+## Android em emulador — 1.10.4 (Prisma, coordenação Compasso, 31/10/2026)
+
+Emulador Android 17 com Chrome no portal Maestri “Pixel”; candidata servida em `http://localhost:8791/` no emulador por `adb reverse tcp:8791 tcp:8791`, a partir de um servidor estático isolado (cópia de `work/qa-server.cjs`) que serve `work/delivery-integration` ao vivo, no terminal Compasso; dados fictícios; capturas guardadas na pasta temporária local do Maestri Portal (não versionadas, fora da distribuição).
+
+- HEAD 44f74a1: PWA instalado pelo menu do Chrome abre em janela própria com v1.10.4; com modo avião e sem o túnel adb, app e Manual abriram do cache. Câmera pede permissão só ao tocar Tirar foto. App instalado fica em retrato (manifest); retrato sem rolagem horizontal; no cadastro o botão Salvar fica atrás do teclado até fechá-lo. Edifício, vistoria e foto persistiram após fechar e reabrir. Checklist em `http://localhost:8766/` (via `adb reverse tcp:8766 tcp:8766`) legível em retrato e paisagem.
+- GPS, achado: no primeiro uso a permissão de localização aparece depois da câmera e a foto saía sem coordenadas. Correções 1ecfb06, 9a2c690 e 5dbc597.
+- GPS em 5dbc597 (resposta ao pedido até 30 s, leitura até 15 s após a resposta): permitir ~10 s e ~25 s após o pedido saiu com coordenadas; negar saiu sem coordenadas com “Sem GPS”, sem travar. Em 9a2c690 (prazo contado da volta da câmera) permitir imediatamente saiu com coordenadas e a foto seguinte, com permissão concedida, também. Em uma rodada a foto levou ~45 s para aparecer (processamento no emulador).
+- Limites: emulador, não aparelho físico; TalkBack apenas preparado, sem ensaio.
