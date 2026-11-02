@@ -1,0 +1,46 @@
+@startuml
+title DIAGRAMA DE CASOS DE USO · PLATAFORMA CENTRAL, CENTRAL E PAINEL
+left to right direction
+skinparam packageStyle rectangle
+footer Responsável: Eng. DSc Li Chong Lee Bacelar de Castro
+actor "Vistoriador" as L1
+actor "Administrador\n(unidade / plataforma)" as L2
+actor "Gestor, Operacional\ne Chefia" as D1
+rectangle "CGU Vistorias" {
+  package "Plataforma e sincronização" {
+    usecase "Entrar e controlar acesso por papel" as UC16
+    usecase "Sincronizar, arquivar e restaurar" as UC17
+    usecase "Gravar e enviar vídeo" as UC18
+  }
+  package "Central (administração)" {
+    usecase "Gerir pessoas" as UC19
+    usecase "Gerir edifícios e vínculos" as UC20
+    usecase "Fazer backup e limpar dados" as UC21
+    usecase "Cadastrar a unidade" as UC22
+    usecase "Armazenamento e cotas" as UC23
+  }
+  package "Painel e governança" {
+    usecase "Consultar o painel gerencial" as UC24
+    usecase "Tratar chamado (baixa e aprovação)" as UC25
+    usecase "Gerir OKR (objetivos e KRs)" as UC26
+    usecase "Governar a regra de risco" as UC27
+  }
+}
+L1 --> UC16
+L1 --> UC17
+L1 --> UC18
+L2 --> UC16
+L2 --> UC17
+L2 --> UC18
+L2 --> UC19
+L2 --> UC20
+L2 --> UC21
+L2 --> UC22
+L2 --> UC23
+L2 --> UC24
+L2 --> UC25
+L2 --> UC26
+L2 --> UC27
+D1 --> UC24
+D1 --> UC25
+@enduml

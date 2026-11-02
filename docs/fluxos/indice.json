@@ -1,0 +1,272 @@
+[
+ {
+  "arq": "FL-00-Visao-geral",
+  "titulo": "FL-00 · Visão geral da vistoria",
+  "etapa": "Todas",
+  "resumo": "Da configuração do perfil ao backup: a jornada completa do vistoriador no aplicativo.",
+  "w": 1340,
+  "h": 928,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-01-Primeiro-acesso-e-instalacao",
+  "titulo": "FL-01 · Primeiro acesso e instalação",
+  "etapa": "Etapa 01",
+  "resumo": "Preparação do aparelho antes de ir a campo: carregamento com internet, instalação, permissões e teste offline.",
+  "w": 1125,
+  "h": 778,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-02-Configurar-perfil",
+  "titulo": "FL-02 · Configurar o perfil",
+  "etapa": "Etapa 02",
+  "resumo": "Ajustes de unidade, responsável técnico, identificação do vistoriador, carimbo das fotos e PIN do Painel.",
+  "w": 1125,
+  "h": 778,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-03-Cadastrar-edificio",
+  "titulo": "FL-03 · Cadastrar e encontrar um edifício",
+  "etapa": "Etapa 03",
+  "resumo": "Busca na lista de Edifícios, cadastro de novo edifício e abertura do cartão com a vistoria em rascunho.",
+  "w": 1125,
+  "h": 778,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-04-Criar-vistoria",
+  "titulo": "FL-04 · Criar uma vistoria",
+  "etapa": "Etapa 04",
+  "resumo": "Criação da ficha em rascunho dentro do edifício e cuidados antes de excluir ou exportar o edifício.",
+  "w": 1340,
+  "h": 928,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-05-Dados-da-visita",
+  "titulo": "FL-05 · Preencher os dados da visita",
+  "etapa": "Etapa 05",
+  "resumo": "Contexto da inspeção: local, tipo, data e hora, participantes, GPS, clima, objetivo, metodologia e documentos.",
+  "w": 1125,
+  "h": 928,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-06-Registrar-fotos",
+  "titulo": "FL-06 · Registrar as fotos",
+  "etapa": "Etapa 06",
+  "resumo": "Captura pela câmera (com data, hora e GPS) ou importação da galeria, e legenda da imagem.",
+  "w": 1340,
+  "h": 928,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-07-Descrever-imagem",
+  "titulo": "FL-07 · Descrever e recortar a imagem",
+  "etapa": "Etapa 07",
+  "resumo": "Legenda objetiva, conferência de data e localização, recorte para meia folha e exclusão com confirmação.",
+  "w": 1125,
+  "h": 778,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-08-Marcar-pontos",
+  "titulo": "FL-08 · Marcar pontos de interesse",
+  "etapa": "Etapa 08",
+  "resumo": "Editor de marcações sobre a foto: seta, retângulo, círculo e número; desfazer, limpar, cancelar e concluir.",
+  "w": 1125,
+  "h": 928,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-09-Registrar-constatacoes",
+  "titulo": "FL-09 · Registrar as constatações",
+  "etapa": "Etapa 09",
+  "resumo": "Tipo (lista por sistema), ambiente, gravidade, descrição, recomendação e fotos relacionadas.",
+  "w": 1340,
+  "h": 778,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-10-Concluir-registro",
+  "titulo": "FL-10 · Concluir o registro",
+  "etapa": "Etapa 10",
+  "resumo": "Parecer, recomendações (uma por linha) e revisão final antes de emitir.",
+  "w": 910,
+  "h": 778,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-11-Emitir-documento",
+  "titulo": "FL-11 · Emitir Word ou PDF",
+  "etapa": "Etapa 11",
+  "resumo": "Avisos, escolha do documento, rascunho ou emissão oficial (número sequencial local), nova revisão e download.",
+  "w": 1555,
+  "h": 1078,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-12-Acompanhar-pelo-Painel",
+  "titulo": "FL-12 · Acompanhar pelo Painel",
+  "etapa": "Etapa 12",
+  "resumo": "Acesso (com PIN, se houver), indicadores, filtros, agrupamentos e exportação CSV.",
+  "w": 1340,
+  "h": 928,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-13-Backup-e-consolidacao",
+  "titulo": "FL-13 · Guardar e reunir os backups",
+  "etapa": "Etapa 13",
+  "resumo": "Exportação do .json ao fim da jornada e importação (mesclagem por identificador) para restaurar ou consolidar.",
+  "w": 1265,
+  "h": 1076,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-14-Duvidas-frequentes",
+  "titulo": "FL-14 · Diagnóstico das dúvidas frequentes",
+  "etapa": "Etapa 14",
+  "resumo": "Árvore de decisão para os problemas mais comuns: registros ausentes, arquivos que não abrem ou não compartilham, câmera/GPS e uso sem internet.",
+  "w": 970,
+  "h": 928,
+  "erros": 0,
+  "avisos": 1
+ },
+ {
+  "arq": "FL-15-Login-e-papeis",
+  "titulo": "FL-15 · Entrar e controlar o acesso por papel",
+  "etapa": "Plataforma",
+  "resumo": "Login por e-mail e senha ou GitHub (administradores), conferência do papel e da validade do acesso e direcionamento ao ambiente do perfil.",
+  "w": 1695,
+  "h": 928,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-16-Sincronizar-arquivar-restaurar",
+  "titulo": "FL-16 · Sincronizar, arquivar e restaurar",
+  "etapa": "Plataforma",
+  "resumo": "Envio de snapshots, relatórios, fotos e ações à Central, confirmação do arquivamento e restauração por páginas.",
+  "w": 1340,
+  "h": 928,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-17-Gravar-e-enviar-video",
+  "titulo": "FL-17 · Gravar e enviar vídeo da constatação",
+  "etapa": "Plataforma",
+  "resumo": "Gravação de campo, legenda, envio ao repositório (limite de 50 MB) e consulta na tela Vídeos.",
+  "w": 1340,
+  "h": 778,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-18-Gerir-pessoas",
+  "titulo": "FL-18 · Gerir pessoas",
+  "etapa": "Central",
+  "resumo": "Convite, papel, vencimento, senha temporária, associação a unidades, desativação e exclusão com checagem de bloqueios.",
+  "w": 1555,
+  "h": 1078,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-19-Gerir-edificios-e-vinculos",
+  "titulo": "FL-19 · Gerir edifícios e vínculos",
+  "etapa": "Central",
+  "resumo": "Criação do edifício central, vínculo de pessoas e mapeamento dos edifícios locais por pedido de vínculo.",
+  "w": 1340,
+  "h": 778,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-20-Backup-e-limpeza",
+  "titulo": "FL-20 · Fazer backup e limpar dados",
+  "etapa": "Central",
+  "resumo": "Limpeza em duas etapas com confirmação, condicionada a um backup recente (até 24 h) e registrada em log.",
+  "w": 1340,
+  "h": 778,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-21-Cadastro-da-unidade",
+  "titulo": "FL-21 · Cadastrar a unidade",
+  "etapa": "Central",
+  "resumo": "Dados da organização e do responsável técnico, usados nos laudos.",
+  "w": 1265,
+  "h": 778,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-22-Armazenamento-e-cotas",
+  "titulo": "FL-22 · Acompanhar armazenamento e cotas",
+  "etapa": "Central",
+  "resumo": "Uso de armazenamento por pessoa e por unidade e ajuste da cota.",
+  "w": 1125,
+  "h": 778,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-23-Painel-gerencial",
+  "titulo": "FL-23 · Consultar o painel gerencial",
+  "etapa": "Painel",
+  "resumo": "Demonstração ou dados reais do piloto, filtros, política de privacidade, KPIs e modos de exibição.",
+  "w": 1340,
+  "h": 928,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-24-Chamado-baixa-aprovacao",
+  "titulo": "FL-24 · Tratar chamado: baixa e aprovação",
+  "etapa": "Painel",
+  "resumo": "Do sinal de risco ao encerramento do chamado, com baixa e anexo pelo Operacional e decisão da Chefia.",
+  "w": 1340,
+  "h": 778,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-25-OKR",
+  "titulo": "FL-25 · Gerir objetivos e resultados-chave (OKR)",
+  "etapa": "Central",
+  "resumo": "Ciclos, objetivos e resultados-chave ligados aos KPIs do painel; metas só quando definidas pelo dono dos dados.",
+  "w": 1695,
+  "h": 928,
+  "erros": 0,
+  "avisos": 0
+ },
+ {
+  "arq": "FL-26-Governanca-de-risco",
+  "titulo": "FL-26 · Governar a regra de risco",
+  "etapa": "Central",
+  "resumo": "Proposta, aprovação ou rejeição e revogação de regras de risco versionadas.",
+  "w": 1340,
+  "h": 928,
+  "erros": 0,
+  "avisos": 0
+ }
+]

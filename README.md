@@ -28,6 +28,7 @@ Hospede esta pasta em HTTPS, preservando os caminhos. Não há dependências par
 - [Manual ilustrado HTML](manual.html), disponível pela aba Manual.
 - [Manual PDF](docs/manual-usuario.pdf): 20 páginas, gerado do manual HTML 1.10.4, com 12 telas da versão 1.10.4 e dados fictícios.
 - [Diagramas UML e BPMN](docs/diagramas.html): estrutura e fluxo de funcionamento da ferramenta, com fontes editáveis.
+- [Caso de uso e fluxogramas (navegável)](docs/fluxos/index.html) e [PDF](docs/fluxos/Caso-de-uso-e-fluxogramas.pdf): 27 casos de uso, 27 fluxogramas BPMN (14 etapas do manual, visão geral e plataforma central, Central e Painel), os diagramas de estrutura, relacionamentos (banco central) e segurança e 15 itens de documentação complementar (matriz de papéis, estados, sequências, privacidade, implantação, telas, modelo local, dicionário de dados, KPIs, testes, guias por perfil e glossário), desenhados no [app-fluxos](https://github.com/lichonglee/app-fluxos) com a identidade visual da CGU. Os itens da plataforma central vêm do relato do agente Compasso e do schema da branch codex/release-candidate-1.1.0 (v1.27.12) e devem ser confirmados nos manuais da Central e do Painel. Fontes em `docs/fluxos`; para refazer: `APP_FLUXOS=<clone do app-fluxos> node docs/fluxos/gerar.js`, `node docs/fluxos/documento.js` e `node docs/fluxos/navegavel.js`.
 
 ## Identidade visual
 

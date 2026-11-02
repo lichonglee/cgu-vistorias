@@ -1,0 +1,53 @@
+@startuml
+title DIAGRAMA DE CASOS DE USO · APLICATIVO DE CAMPO v1.0.5
+left to right direction
+skinparam packageStyle rectangle
+footer Responsável: Eng. DSc Li Chong Lee Bacelar de Castro
+actor "Vistoriador" as L1
+actor "Dispositivo\n(câmera, GPS,\narmazenamento)" as D1
+actor "Equipe da unidade\n/ Responsável técnico" as D2
+rectangle "CGU Vistorias" {
+  package "Preparação" {
+    usecase "Instalar e preparar o aplicativo" as UC01
+    usecase "Configurar o perfil" as UC02
+    usecase "Cadastrar e localizar edifício" as UC03
+    usecase "Criar vistoria" as UC04
+    usecase "Consultar o manual e solucionar dúvidas" as UC14
+  }
+  package "Registro em campo" {
+    usecase "Preencher os dados da visita" as UC05
+    usecase "Registrar fotos" as UC06
+    usecase "Descrever e recortar a imagem" as UC07
+    usecase "Marcar pontos de interesse" as UC08
+    usecase "Registrar constatações" as UC09
+  }
+  package "Emissão e guarda" {
+    usecase "Concluir o registro" as UC10
+    usecase "Emitir documento (Word ou PDF)" as UC11
+    usecase "Acompanhar pelo Painel" as UC12
+    usecase "Exportar e importar backup" as UC13
+    usecase "Excluir registros" as UC15
+  }
+}
+L1 --> UC01
+L1 --> UC02
+L1 --> UC03
+L1 --> UC04
+L1 --> UC14
+L1 --> UC05
+L1 --> UC06
+L1 --> UC07
+L1 --> UC08
+L1 --> UC09
+L1 --> UC10
+L1 --> UC11
+L1 --> UC12
+L1 --> UC13
+L1 --> UC15
+UC06 ..> UC07 : <<include>>
+UC08 ..> UC07 : <<extend>>
+D1 --> UC05
+D1 --> UC06
+D2 --> UC11
+D2 --> UC13
+@enduml
