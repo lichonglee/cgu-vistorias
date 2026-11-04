@@ -35,7 +35,7 @@ const METOD = 'Inspeção visual realizada in loco, com registro fotográfico ge
 const DEFAULTS = {
   empresa: { nome: 'Controladoria-Geral da União', cnpj: '26.664.015/0001-48', endereco: 'SAUS, Quadra 5, Bloco A, Lotes 9 e 10, Edifício MultiBrasil, Asa Sul, Brasília/DF - CEP 70070-050', fone: '(61) 2020-6831', email: 'cglpe.cogea@cgu.gov.br' },
   rt: { nome: 'Li Chong Lee Bacelar de Castro', titulo: 'Coordenador de Engenharia e Arquitetura - COGEA', crea: '12158 DF' },
-  usuario: '', carimbo: true, maxpx: 1600, guardarOriginal: true, pinHash: ''
+  usuario: '', carimbo: true, maxpx: 1600, pinHash: ''
 };
 let S = null, logo = null, token = 0, tab = 'dados', pendingFollowUpFindingId = '';
 const urls = {};
@@ -169,7 +169,6 @@ async function addPhotos(files, kind) {
     const ts = kind === 'cam' ? (lm && Math.abs(now - lm) < 15 * 60000 ? lm : now) : (lm || now);
     const { blob, w, h, stampLines } = await processImage(file, ts, pos, v);
     last = { id: DB.uid(), vistoriaId: v.id, blob, ts, lat: pos?.lat ?? null, lon: pos?.lon ?? null, acc: pos?.acc ?? null, descricao: '', origem: kind === 'cam' ? 'camera' : 'galeria', w, h, stampLines };
-    if (S.guardarOriginal !== false) last.original = new Blob([file], { type: file.type || 'image/jpeg' });
     await DB.put('fotos', last);
   }
   { const x = await DB.get('vistorias', v.id); x.nFotos = (await DB.by('fotos', 'vistoriaId', v.id)).length; await touchV(x); }
@@ -184,7 +183,6 @@ async function photoSheet(id, fromCam) {
   const nums = [...new Set((f.marks || []).filter(m => m.t === 'num').map(m => m.n))].sort((x, y) => x - y);
   const el = modal(`<h2>Foto ${pad(n)}</h2><img class="big" src="${urlOf(f)}" alt="Foto ${pad(n)}${f.descricao ? ': ' + esc(f.descricao) : ''}">
     <div class="mut small">🕒 ${esc(Rep.fTs(f.ts))}<br>📍 ${esc(Rep.fLoc(f))}${f.origem === 'galeria' ? '<br>(importada da galeria)' : ''}</div>
-    ${f.original ? `<button class="btn sec block" id="pbo" style="margin-top:10px">⬇ Baixar foto original (${(f.original.size / 1048576).toFixed(1)} MB)</button>` : '<div class="mut small" style="margin-top:10px">Foto original não guardada (opção em Ajustes).</div>'}
     <button class="btn sec block" id="pcr" style="margin-top:10px">✂ Recortar para caber na meia folha${f.cortada ? ' (já recortada)' : ''}</button>
     <button class="btn sec block" id="pfit" style="margin-top:8px">↘ Diminuir foto para caber inteira${f.ajustada ? ' (já ajustada)' : ''}</button>
     ${f.cropBackup ? `<button class="btn sec block" id="pun" style="margin-top:8px">↩ Desfazer ${f.cortada ? 'recorte' : 'redução'}</button>` : '' }
@@ -194,7 +192,6 @@ async function photoSheet(id, fromCam) {
     <div class="row wrap" style="margin-top:12px"><button class="btn grow" id="ps">Salvar</button>${fromCam ? '<button class="btn sec grow" id="pn">Salvar e nova foto</button>' : ''}</div>
     <div class="row sp" style="margin-top:10px"><button class="btn bad sm" id="pdel">Excluir foto</button><button class="btn ghost sm" id="pc">Fechar</button></div>`);
   const save = async () => { f.descricao = $('#pd').value.trim(); f.notas = nums.map(k => ({ n: k, txt: (el.querySelector(`.pn[data-n="${k}"]`)?.value || '').trim() })); await DB.put('fotos', f); const v = await DB.get('vistorias', f.vistoriaId); await touchV(v); };
-  const pbo = el.querySelector('#pbo'); if (pbo) pbo.onclick = () => baixar(f.original, nomeOriginal(f, n));
   el.querySelector('#pcr').onclick = async () => { await save(); closeModal(); await recortarFoto(f); await route(); photoSheet(f.id, fromCam); };
   el.querySelector('#pfit').onclick = async () => { await save(); closeModal(); await recortarFoto(f, 'fit'); await route(); photoSheet(f.id, fromCam); };
   const pun = el.querySelector('#pun'); if (pun) pun.onclick = async () => { await save(); closeModal(); await desfazerRecorte(f); await route(); photoSheet(f.id, fromCam); };
@@ -682,8 +679,7 @@ function abrirComparacaoEmissoes(leftId, ems, snapshots, states) {
 async function emitir(vid, tipo, fmt, oficial, novaRev) {
   const v = await DB.get('vistorias', vid), o = await DB.get('obras', v.obraId);
   const fotos = (await DB.by('fotos', 'vistoriaId', vid)).sort(byTs);
-  const temOriginal = fotos.some(f => f.original);
-  for (const f of fotos) { f.bytes = new Uint8Array(await f.blob.arrayBuffer()); delete f.original; }
+  for (const f of fotos) f.bytes = new Uint8Array(await f.blob.arrayBuffer());
   let rev = 0, numero = null;
   if (oficial) {
     const r = await DB.reservarNumeracao(vid, new Date().getFullYear()); v.seq = r.seq; v.ano = r.ano;
@@ -710,35 +706,10 @@ async function emitir(vid, tipo, fmt, oficial, novaRev) {
     const x = await DB.get('vistorias', vid); if (x.status !== 'emitido') { x.status = 'emitido'; await DB.put('vistorias', x); }
   }
   const el = modal(`<h2>Arquivo pronto</h2><div class="card small"><b>${esc(nome)}</b><div class="mut">${(blob.size / 1024).toFixed(0)} KB${oficial ? ' · registrado no painel' : ' · rascunho (sem registro)'}</div></div>
-    <div class="row wrap"><button class="btn grow" id="dl">Baixar</button><button class="btn sec grow" id="sh">Compartilhar</button></div>${temOriginal ? '<button class="btn sec block" id="dlo" style="margin-top:10px">⬇ Baixar fotos originais (.zip)</button>' : ''}<button class="btn ghost block" id="cl"style="margin-top:10px">Fechar</button>`, () => route());
+    <div class="row wrap"><button class="btn grow" id="dl">Baixar</button><button class="btn sec grow" id="sh">Compartilhar</button></div><button class="btn ghost block" id="cl" style="margin-top:10px">Fechar</button>`, () => route());
   el.querySelector('#dl').onclick = () => baixar(blob, nome);
   el.querySelector('#sh').onclick = () => compartilhar(blob, nome);
-  const dlo = el.querySelector('#dlo'); if (dlo) dlo.onclick = () => baixarOriginais(v.id);
   el.querySelector('#cl').onclick = closeModal;
-}
-const extOf = b => ({ 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif' })[b.type] || 'jpg';
-const nomeOriginal = (f, n) => `Foto${pad(n)}_${new Date(f.ts).toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-')}_original.${extOf(f.original)}`;
-const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
-const crc32 = u => { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = CRC[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
-async function zipStore(files) { /* ZIP sem compressão (JPEG já é comprimido) */
-  const enc = new TextEncoder(), parts = [], cen = []; let off = 0, csz = 0;
-  for (const { name, blob } of files) {
-    const data = new Uint8Array(await blob.arrayBuffer()), nm = enc.encode(name), crc = crc32(data);
-    const lh = new DataView(new ArrayBuffer(30)); lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, nm.length, true);
-    parts.push(lh.buffer, nm, data);
-    const ch = new DataView(new ArrayBuffer(46)); ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, nm.length, true); ch.setUint32(42, off, true);
-    cen.push(ch.buffer, nm); csz += 46 + nm.length; off += 30 + nm.length + data.length;
-  }
-  const end = new DataView(new ArrayBuffer(22)); end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, csz, true); end.setUint32(16, off, true);
-  return new Blob([...parts, ...cen, end.buffer], { type: 'application/zip' });
-}
-async function baixarOriginais(vid) {
-  const v = await DB.get('vistorias', vid), all = (await DB.by('fotos', 'vistoriaId', vid)).sort(byTs);
-  const files = all.map((f, i) => f.original && { name: nomeOriginal(f, i + 1), blob: f.original }).filter(Boolean);
-  if (!files.length) return toast('Esta vistoria não tem fotos originais guardadas.', 4000);
-  toast('Preparando fotos originais…');
-  baixar(await zipStore(files), `Fotos-originais_${slug(v.local || 'vistoria')}_${v.data || hoje()}.zip`);
-  if (files.length < all.length) toast(`${all.length - files.length} foto(s) sem original guardada.`, 4000);
 }
 function baixar(blob, nome) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000); }
 async function compartilhar(blob, nome) {
@@ -824,11 +795,10 @@ async function vPainel(view) {
       <div><label>De</label><input type="date" data-f="de" value="${esc(filtro.de)}"></div><div><label>Até</label><input type="date" data-f="ate" value="${esc(filtro.ate)}"></div></div>
       <label>Buscar local ou edifício</label><input data-f="q" type="search" value="${esc(filtro.q)}"></div>
     <div class="seg"><button data-g="obra" class="${filtro.grupo === 'obra' ? 'on' : ''}">Agrupar por edifício</button><button data-g="local" class="${filtro.grupo === 'local' ? 'on' : ''}">Agrupar por local visitado</button></div>
-    ${Object.keys(grupos).sort().map(k => { const g = grupos[k]; const ge = E.filter(e => g.some(v => v.id === e.vistoriaId)); return `<h3>${esc(k)} <span class="mut small">· ${g.length} vistoria(s) · ${ge.length} emissão(ões)</span></h3><div class="tw"><table><tr><th>Nº</th><th>${filtro.grupo === 'obra' ? 'Local' : 'Edifício'}</th><th>Data</th><th>Situação</th><th>Fotos</th><th>Última emissão</th><th>Originais</th></tr>${g.map(v => { const le = E.find(e => e.vistoriaId === v.id); return `<tr data-go="#/vistoria/${esc(v.id)}" style="cursor:pointer"><td>${v.seq ? 'VT-' + esc(pad(v.seq, 3)) + '/' + esc(v.ano) : '—'}</td><td>${esc(filtro.grupo === 'obra' ? (v.local || '—') : (om[v.obraId]?.nome || '—'))}</td><td>${esc(Rep.fData(v.data))}</td><td>${stChip(v)}</td><td>${Number(v.nFotos)||0}</td><td>${le ? 'Rev. ' + esc(pad(le.rev)) + ' · ' + esc(Rep.fTs(le.data).slice(0, 10)) : '—'}</td><td>${Number(v.nFotos) ? `<button class="btn sec sm" data-orig="${esc(v.id)}">⬇ .zip</button>` : '—'}</td></tr>`; }).join('')}</table></div>`; }).join('') || '<div class="empty">Nenhuma vistoria para os filtros.</div>'}
+    ${Object.keys(grupos).sort().map(k => { const g = grupos[k]; const ge = E.filter(e => g.some(v => v.id === e.vistoriaId)); return `<h3>${esc(k)} <span class="mut small">· ${g.length} vistoria(s) · ${ge.length} emissão(ões)</span></h3><div class="tw"><table><tr><th>Nº</th><th>${filtro.grupo === 'obra' ? 'Local' : 'Edifício'}</th><th>Data</th><th>Situação</th><th>Fotos</th><th>Última emissão</th></tr>${g.map(v => { const le = E.find(e => e.vistoriaId === v.id); return `<tr data-go="#/vistoria/${esc(v.id)}" style="cursor:pointer"><td>${v.seq ? 'VT-' + esc(pad(v.seq, 3)) + '/' + esc(v.ano) : '—'}</td><td>${esc(filtro.grupo === 'obra' ? (v.local || '—') : (om[v.obraId]?.nome || '—'))}</td><td>${esc(Rep.fData(v.data))}</td><td>${stChip(v)}</td><td>${Number(v.nFotos)||0}</td><td>${le ? 'Rev. ' + esc(pad(le.rev)) + ' · ' + esc(Rep.fTs(le.data).slice(0, 10)) : '—'}</td></tr>`; }).join('')}</table></div>`; }).join('') || '<div class="empty">Nenhuma vistoria para os filtros.</div>'}
     <div class="row sp"><h2>Registro de emissões</h2><button class="btn sec sm" id="csv">Exportar CSV</button></div>
     <div class="tw"><table><tr><th>Data/hora</th><th>Documento</th><th>Rev.</th><th>Tipo</th><th>Fmt</th><th>Edifício · Local</th><th>Emitido por</th></tr>${E.slice(0, 80).map(e => `<tr><td>${esc(Rep.fTs(e.data))}</td><td>${esc(e.numero)}</td><td>${esc(pad(e.rev))}</td><td>${esc(tipoNome(e.tipo, true))}</td><td>${esc(String(e.formato||'').toUpperCase())}</td><td>${esc((om[e.obraId]?.nome || '') + ' · ' + (vm[e.vistoriaId]?.local || ''))}</td><td>${esc(e.usuario || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="mut">Sem emissões.</td></tr>'}</table></div>`;
   bindGo(view);
-  view.querySelectorAll('[data-orig]').forEach(b => b.onclick = e => { e.stopPropagation(); baixarOriginais(b.dataset.orig); });
   const followUpFilter=view.querySelector('#follow-up-reason');
   if (followUpFilter) {
     let page = 0;
@@ -882,7 +852,6 @@ async function vAjustes(view) {
     <div class="card"><h3 style="margin-top:0">Vistoriador (este aparelho)</h3>${fld('Seu nome (aparece no registro de emissões)', 'usuario', S)}
       <div class="sw"><input type="checkbox" data-f="carimbo" id="st" ${S.carimbo ? 'checked' : ''}><label for="st">Gravar data, hora e GPS na própria imagem</label></div>
       <label>Tamanho máximo das fotos</label><select data-f="maxpx"><option value="1280" ${S.maxpx == 1280 ? 'selected' : ''}>Leve (1280 px)</option><option value="1600" ${S.maxpx == 1600 ? 'selected' : ''}>Padrão (1600 px)</option><option value="2400" ${S.maxpx == 2400 ? 'selected' : ''}>Alta (2400 px)</option></select></div>
-    <div class="card"><div class="sw"><input type="checkbox" data-f="guardarOriginal" id="go2" ${S.guardarOriginal !== false ? 'checked' : ''}><label for="go2">Guardar a foto original (sem redução nem carimbo) para baixar depois</label></div><div class="mut small">Ocupa mais espaço no aparelho. As originais ficam só neste aparelho e não entram no backup. Vale para as próximas fotos.</div></div>
     <div class="card"><h3 style="margin-top:0">PIN do painel administrativo</h3><p class="mut small">Impede que outra pessoa abra o Painel neste aparelho. É uma barreira simples de uso, não criptografia dos dados.</p>
       <div class="row"><input id="pin1" type="password" inputmode="numeric" placeholder="Novo PIN (4 a 12 dígitos)" maxlength="12"><button class="btn sm" id="sp">${S.pinHash ? 'Trocar' : 'Definir'}</button></div>${S.pinHash ? '<button class="btn ghost sm" id="rp" style="margin-top:8px">Remover PIN</button>' : ''}</div>
     <div class="card"><h3 style="margin-top:0">Backup e consolidação</h3><p class="mut small">Os dados ficam só neste aparelho. Exporte o backup para guardar ou para reunir vistorias de vários celulares: ao importar, os registros são <b>mesclados</b>, sem apagar os existentes.</p>
