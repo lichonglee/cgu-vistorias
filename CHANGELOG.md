@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## 1.10.5 · 03/11/2026
+
+- Fotos originais: o aplicativo guarda o arquivo original (sem redução nem carimbo), com opção em Ajustes. Download individual na ficha da foto, em .zip por vistoria na tabela do Painel e no aviso de arquivo pronto após emitir. As originais ficam só no aparelho e não entram no backup nem no snapshot da emissão.
+
 ## 1.10.4 · 30/10/2026
 
 - Ações declaradas: salvar com a função responsável vazia passa a informar que o campo é obrigatório; o limite de 120 caracteres tem mensagem própria. Nenhuma regra de validação mudou.

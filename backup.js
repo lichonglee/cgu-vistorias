@@ -120,7 +120,7 @@
     for(const e of d.emissoes) if(e.snapshotId){id(e.snapshotId,'snapshotId');if(!snapMap.has(e.snapshotId))continue;const s=snapMap.get(e.snapshotId);if(s.emissaoId!==e.id||s.hash!==e.snapshotHash)fail('Snapshot não corresponde à emissão');}
     return { data:d, decodedTotal, photoHashes, snapshotIds:new Set(snaps.map(s=>s.id)), artifactIds:new Set(arts.map(a=>a.id)) };
   }
-  async function photoJson(f, b64) { const {blob,base,cropBackup,contentSha256,...rest}=f; const c=cropBackup?{...cropBackup,blob:cropBackup.blob?await b64(cropBackup.blob):undefined,base:cropBackup.base?await b64(cropBackup.base):undefined}:undefined; return {...rest,data:await b64(blob),...(base?{baseData:await b64(base)}:{}),...(c?{cropBackup:c}:{})}; }
+  async function photoJson(f, b64) { const {blob,base,original,cropBackup,contentSha256,...rest}=f; const c=cropBackup?{...cropBackup,blob:cropBackup.blob?await b64(cropBackup.blob):undefined,base:cropBackup.base?await b64(cropBackup.base):undefined}:undefined; return {...rest,data:await b64(blob),...(base?{baseData:await b64(base)}:{}),...(c?{cropBackup:c}:{})}; }
   const selectEmissionsForVistorias = (emissoes, vistoriaIds) => (Array.isArray(emissoes)?emissoes:[]).filter(e=>vistoriaIds instanceof Set&&vistoriaIds.has(e?.vistoriaId));
   function decodePhoto(f, BlobCtor=Blob) {
     const {data,baseData,cropBackup,...rest}=f;
